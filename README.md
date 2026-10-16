@@ -8,6 +8,7 @@
 [![Prisma](https://img.shields.io/badge/Prisma-5.9-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io/)
 [![KaTeX](https://img.shields.io/badge/KaTeX-0.19-00D4FF)](https://katex.org/)
 [![Vitest](https://img.shields.io/badge/Tests-135%20passed-brightgreen?logo=vitest&logoColor=white)](https://vitest.dev/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![152--ФЗ](https://img.shields.io/badge/152--ФЗ-Compliant%20AES--256--GCM-blue)](https://digital.gov.ru/)
 
 **EGE.SYSTEM** — веб-платформа полного цикла для системной подготовки к Единому государственному экзамену по актуальным спецификациям КИМ ФИПИ 2026/2027.
@@ -209,4 +210,4 @@ ege-system/
 
 ## 📄 Лицензия
 
-Проект распространяется под лицензией MIT.
+Проект распространяется под лицензией [MIT](LICENSE). Полный текст лицензии доступен в файле [LICENSE](LICENSE).
