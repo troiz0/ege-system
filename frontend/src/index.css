@@ -1,0 +1,300 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* EGE.SYSTEM — VELVET PROTOCOL
+   Гладкий бархатный фон #09090b, мягкий радиальный свет сверху,
+   единственный акцент — acid lime #d4ff00. Зерно/шум запрещены. */
+@layer base {
+  :root {
+    --background: 0 0% 2%;               /* #050505 */
+    --foreground: 60 4% 95%;             /* #f2f2f0 */
+
+    --card: 240 4% 4%;                  /* #0a0a0c */
+    --card-foreground: 60 4% 95%;
+
+    --popover: 240 4% 4%;
+    --popover-foreground: 60 4% 95%;
+
+    --primary: 74 100% 50%;              /* #d4ff00 acid lime */
+    --primary-foreground: 0 0% 2%;
+
+    --secondary: 240 4% 7%;
+    --secondary-foreground: 240 5% 65%;
+
+    --muted: 240 4% 7%;
+    --muted-foreground: 240 3% 48%;
+
+    --accent: 240 4% 8%;
+    --accent-foreground: 60 4% 95%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 100% / 0.09;
+    --input: 0 0% 100% / 0.1;
+    --ring: 74 100% 50%;
+
+    color-scheme: dark;
+  }
+
+  html {
+    background: #09090b;
+  }
+
+  html.lenis, html.lenis body {
+    height: auto;
+  }
+  .lenis.lenis-smooth {
+    scroll-behavior: auto !important;
+  }
+  .lenis.lenis-stopped {
+    overflow: hidden;
+  }
+
+  body {
+    @apply bg-[#09090b] text-zinc-100 font-sans antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    background: #d4ff00;
+    color: #050505;
+  }
+
+  h1, h2, h3 {
+    letter-spacing: -0.02em;
+  }
+
+  button {
+    transition:
+      background-color 0.2s ease-out,
+      border-color 0.2s ease-out,
+      color 0.2s ease-out,
+      box-shadow 0.2s ease-out,
+      transform 0.2s ease-out;
+  }
+
+  button:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+
+  a {
+    transition: color 0.2s ease-out, opacity 0.2s ease-out;
+  }
+
+  input, select, textarea {
+    transition: border-color 0.2s ease-out, box-shadow 0.2s ease-out;
+  }
+
+  input::placeholder, textarea::placeholder {
+    color: #55555f;
+  }
+
+  select option {
+    background-color: #0e0e12;
+    color: #f2f2f0;
+  }
+
+  select option:checked {
+    background-color: #d4ff00;
+    color: #050505;
+  }
+
+  :focus-visible {
+    outline: 2px solid rgba(212, 255, 0, 0.6);
+    outline-offset: 2px;
+  }
+
+  /* Тонкий бархатный скроллбар */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #09090b;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #1d1d23;
+    border-radius: 0;
+    border: 2px solid #09090b;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #2c2c34;
+  }
+}
+
+@layer components {
+  /* Матовое стекло HUD */
+  .glass {
+    @apply border border-white/10 bg-white/[0.02] backdrop-blur-xl;
+  }
+  .glass-strong {
+    @apply border border-white/10 bg-[#0a0a0c]/80 backdrop-blur-xl;
+  }
+
+  /* Верхний блик по кромке — имитация физического света */
+  .bg-zinc-900 {
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+  }
+
+  /* ── Компоненты HUD (слой components: обычные utilities вроде
+     border-[#d4ff00] и bg-[#d4ff00]/10 всегда их перекрывают,
+     поэтому состояния selected/hover/focus работают) ── */
+
+  /* Карточка-контейнер */
+  .card-shelf {
+    @apply rounded-none border border-white/[0.08] bg-white/[0.02] backdrop-blur-xl;
+  }
+
+  /* Моноширинный чип */
+  .mono-chip {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    @apply inline-flex items-center gap-1.5 rounded-none border border-white/10 bg-white/[0.03] px-2.5 py-1 text-zinc-400;
+  }
+
+  /* Кнопки */
+  .btn-lime {
+    @apply inline-flex items-center justify-center gap-2 rounded-none bg-[#d4ff00] px-4 py-2.5 font-medium text-black transition-all hover:brightness-110 hover:shadow-glow disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-none border border-white/10 bg-white/[0.03] px-4 py-2.5 text-zinc-200 backdrop-blur-xl transition-colors hover:border-[#d4ff00]/40 hover:text-white;
+  }
+
+  /* Поля ввода */
+  .field {
+    @apply w-full rounded-none border border-white/10 bg-zinc-950/60 px-4 py-2.5 text-sm text-zinc-200 placeholder-zinc-600 outline-none transition-colors focus:border-[#d4ff00]/50;
+  }
+  .field-label {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    @apply mb-1.5 block text-zinc-500;
+  }
+
+  /* Строка урока в расписании */
+  .lesson-row {
+    @apply flex items-center justify-between rounded-none border-b border-white/[0.04] px-3 py-3.5 transition-colors hover:bg-white/[0.02];
+  }
+  .lesson-row:last-child {
+    border-bottom-color: transparent;
+  }
+
+  /* Дропзона загрузки */
+  .dropzone {
+    @apply flex cursor-pointer flex-col items-center justify-center gap-2 rounded-none border border-dashed border-white/10 bg-white/[0.01] px-6 py-10 text-center transition-colors hover:border-[#d4ff00]/40 hover:bg-white/[0.02];
+  }
+
+  /* Модальные окна */
+  .modal-veil {
+    @apply fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm;
+  }
+  .modal-body {
+    @apply w-full rounded-none border border-white/10 bg-zinc-900 p-6 shadow-2xl;
+  }
+}
+
+@layer utilities {
+  .animate-slide-in {
+    animation: slideIn 0.3s ease-out;
+  }
+
+  @keyframes slideIn {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  /* Швейцарская display-типографика */
+  .display-giant {
+    font-family: Syne, Inter, system-ui, sans-serif;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: -0.04em;
+    line-height: 0.92;
+  }
+
+  /* Приборный моноширинный микротекст */
+  .hud-tag {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(161, 161, 170, 0.75);
+  }
+
+  /* Тонкая HUD-сетка поверх секций */
+  .hud-grid {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    background-size: 72px 72px;
+    mask-image: radial-gradient(ellipse 90% 80% at 50% 40%, black 30%, transparent 75%);
+  }
+
+  /* ── VELVET SYSTEM: общие поверхности ─────────────────────────── */
+
+  /* Гладкая бархатная страница + мягкий свет сверху */
+  .page-velvet {
+    position: relative;
+    min-height: 100vh;
+    background-color: #09090b;
+    isolation: isolate;
+  }
+  .page-velvet::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 640px;
+    pointer-events: none;
+    z-index: 0;
+    background: radial-gradient(ellipse 80% 80% at 50% -20%, rgba(212, 255, 0, 0.05), rgba(255, 255, 255, 0));
+  }
+  /* ВАЖНО: fixed/sticky-дети (мобильная шапка, оверлей-меню, десктопный
+     сайдбар) исключены — иначе это правило (нелейерный CSS бьёт Tailwind)
+     сбрасывало бы им position: fixed/sticky и z-index, ломая вёрстку */
+  .page-velvet > *:not(.fixed):not(.sticky) {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Маска кинетического reveal заголовков */
+  .reveal-mask {
+    overflow: hidden;
+    display: block;
+  }
+  .reveal-line {
+    display: block;
+    transform: translateY(110%);
+  }
+
+  /* Монохромный ghost-текст вместо обводки (без эффекта «рентгена») */
+  .text-ghost {
+    color: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* Скрыть визуальный скроллбар во всех браузерах (сам скролл работает) */
+::-webkit-scrollbar {
+  display: none;
+  width: 0px;
+  height: 0px;
+  background: transparent;
+}
+
+html,
+body {
+  -ms-overflow-style: none; /* IE и Edge */
+  scrollbar-width: none; /* Firefox */
+  /* clip вместо hidden: убирает горизонтальный скролл, но не ломает position: sticky (сайдбар) */
+  overflow-x: clip;
+}

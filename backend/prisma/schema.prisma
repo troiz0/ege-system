@@ -1,0 +1,425 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                 String   @id @default(uuid())
+  email              String   @unique
+  passwordHash       String?
+  name               String
+  avatarUrl          String?
+  authProvider       String   @default("LOCAL")   // LOCAL | GOOGLE | DEMO
+  googleId           String?  @unique
+  subscriptionTier   String   @default("FREE")    // FREE | PRO
+  proExpiresAt       DateTime?
+  openrouterKeyEnc   String?                      // персональный ключ, зашифрован AES-256-GCM
+  openrouterKeyId    String?                      // hash ключа в OpenRouter Management API
+  meshTokenEnc       String?                      // шифрованный токен сессии МЭШ, AES-256-GCM
+  meshConnectedAt    DateTime?                    // момент подключения аккаунта МЭШ
+  selectedAiModel    String   @default("google/gemini-3.8-flash")
+  trafficUsedPercent Float    @default(0)         // 0-100
+  freeAiRequestsLeft Int      @default(3)
+  freeAiResetAt      DateTime?
+  role               String   @default("student")   // student | tutor | teacher
+  targetTrack        String   @default("TRACK_85")  // BASE_65 | SOLID_85 | OLYMP_95
+  isDemo             Boolean  @default(false)
+  xp                 Int      @default(0)
+  level              Int      @default(1)
+  onboardingCompleted Boolean @default(false)
+  tutorInviteCode    String?  @unique
+  meshEnabled            Boolean  @default(false)
+  meshChatContext        Boolean  @default(false)
+  meshWeakTopics         Boolean  @default(false)
+  meshScorePredictor     Boolean  @default(false)
+  meshScheduleAdaptation Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  profile        UserProfile?
+  targetSubjects TargetSubject[]
+  scheduleItems  ScheduleItem[]
+  homeworks      Homework[]
+  testResults    TestResult[]
+  mockExams      MockExam[]
+  weakTopics     WeakTopic[]
+  studyMaterials TopicStudyMaterial[]
+  aiSnapshots    AiAnalysisSnapshot[]
+  studyPlanItems StudyPlanItem[]
+  transactions   PaymentTransaction[]
+  chatSessions   ChatSession[]
+  flashcards     Flashcard[]
+  examSimulations ExamSimulation[]
+  tutorLinksAsTutor     StudentTutorLink[] @relation("TutorLinks")
+  tutorLinksAsStudent   StudentTutorLink[] @relation("StudentLinks")
+  assignedWorksAsTutor  AssignedWork[]     @relation("TutorAssigned")
+  assignedWorksAsStudent AssignedWork[]    @relation("StudentAssigned")
+  teacherClasses        ClassGroup[]       @relation("TeacherClasses")
+  classMemberships      ClassMember[]      @relation("StudentClassMembers")
+  telegramLinks         TelegramNotificationLink[]
+  mistakeEntries        MistakeEntry[]
+}
+
+model PaymentTransaction {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planName      String                       // PRO_MONTH | PRO_YEAR
+  amount        Float
+  currency      String   @default("RUB")
+  status        String                       // SUCCESS | PENDING | FAILED
+  paymentMethod String                       // MOCK_CARD | TEST_GATEWAY
+  promoCode     String?
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+}
+
+model UserProfile {
+  id                   String    @id @default(uuid())
+  userId               String    @unique
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grade                Int       @default(10)
+  track                String    @default("IT-класс")
+  prepStartDate        DateTime  @default(now())
+  prepEndDate          DateTime?
+  prepMode             String    @default("full_year") // extended | full_year | accelerated_6m | express_1m
+  pace                 String    @default("moderate")  // moderate | intensive
+  weekdayStudyHours    Float     @default(2)
+  weekendStudyHours    Float     @default(4)
+  notes                String?
+  // Подготовка на основе данных из МЭШ (настройки влияния школьного дневника)
+  meshIntegrationEnabled           Boolean   @default(false)
+  meshAiContextEnabled             Boolean   @default(false)
+  meshWeakTopicsEnabled            Boolean   @default(false)
+  meshPredictorInfluenceEnabled    Boolean   @default(false)
+  meshScheduleThrottlingEnabled    Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+}
+
+model TargetSubject {
+  id                    String    @id @default(uuid())
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjectName           String
+  targetScore           Int
+  currentEstimatedScore Int?
+  examDate              DateTime?
+
+  @@index([userId])
+}
+
+model ScheduleItem {
+  id               String  @id @default(uuid())
+  userId           String
+  user             User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dayOfWeek        Int                         // 1-6 (Пн-Сб)
+  subject          String
+  originalMeshName String?
+  topic            String?                      // тема урока (календарный план МЭШ)
+  source           String  @default("manual")  // manual | mesh
+  startTime        String                      // "08:30"
+  endTime          String                      // "09:15"
+  difficulty       String  @default("medium")  // low | medium | high
+
+  @@index([userId, dayOfWeek])
+}
+
+model Homework {
+  id               String   @id @default(uuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject          String
+  title            String
+  description      String?
+  deadline         DateTime
+  estimatedMinutes Int      @default(30)
+  priority         String   @default("medium")   // low | medium | high
+  status           String   @default("pending")  // pending | completed
+  source           String   @default("manual")   // manual | mesh
+  externalKey      String?                        // дедуп: mesh-ключ задания
+  meshAttachments  String?                        // JSON [{name,url,kind}] вложений МЭШ
+  hasAttachment    Boolean  @default(false)
+  attachmentPath   String?
+  detectedTopics   String?                        // JSON-массив строк
+  aiHint           String?
+  aiExplanation    String?                        // сохранённый AI-разбор (JSON MeshExplainResult)
+  createdAt        DateTime @default(now())
+
+  @@index([userId, status])
+  @@unique([userId, externalKey])
+}
+
+model TestResult {
+  id                String   @id @default(uuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject           String
+  title             String
+  scaleType         String                       // 5_point | 10_point | 100_point | raw_fraction
+  score             Float
+  maxScore          Float
+  normalizedPercent Float
+  testDate          DateTime
+  source            String   @default("manual")  // manual | mesh
+  externalKey       String?                        // дедуп: mesh-ключ оценки
+  topic             String?                        // тема урока/работы (МЭШ)
+  mistakeTopics     String?                      // JSON-массив строк
+  comment           String?
+  photoPath         String?                      // путь к фото работы в uploads/
+  createdAt         DateTime @default(now())
+
+  @@index([userId, testDate])
+  @@unique([userId, externalKey])
+}
+
+model MockExam {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject       String
+  examDate      DateTime
+  totalScore    Int                              // 0-100
+  primaryScore  Int?
+  missedTasks   String?                          // JSON: ["13", "18"]
+  mistakeTopics String?                          // JSON-массив строк
+  deltaScore       Int?
+  aiVerdict        String?
+  source           String   @default("manual")      // manual | simulation
+  timeSpentSeconds Int?
+  createdAt        DateTime @default(now())
+
+  @@index([userId, subject, examDate])
+}
+
+model WeakTopic {
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject        String
+  topicName      String
+  frequency      Int       @default(1)
+  lastFailedDate DateTime  @default(now())
+  isResolved     Boolean   @default(false)
+  masteryLevel   Float     @default(0.0)
+  lastTestedAt   DateTime?
+
+  @@unique([userId, subject, topicName])
+}
+
+model TopicStudyMaterial {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject      String
+  topicName    String
+  summaryTheory String
+  formulas     String?
+  formulasImage String?
+  pitfalls     String?
+  algorithm    String?
+  reshuEgeUrl  String?
+  fipiUrl      String?
+  videoQuery   String?
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, subject, topicName])
+}
+
+model AiAnalysisSnapshot {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  demoMode        Boolean  @default(false)
+  rawResponseJson String
+}
+
+model StudyPlanItem {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetDate      DateTime
+  subject         String
+  topic           String
+  kind            String   @default("theory")   // theory | practice_kim | mistakes_review
+  durationMinutes Int
+  isCompleted     Boolean  @default(false)
+  priority        String   @default("medium")
+  materialId      String?                        // ссылка на TopicStudyMaterial
+
+  @@index([userId, targetDate])
+}
+
+model ChatSession {
+  id        String        @id @default(uuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String        @default("Новый диалог")
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  messages  ChatMessage[]
+
+  @@index([userId])
+}
+
+model ChatMessage {
+  id          String      @id @default(uuid())
+  sessionId   String
+  session     ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role        String      // "user" | "assistant"
+  content     String
+  attachments String?     // JSON-массив [{name,url,mimeType,size}] вложений (до 10 файлов)
+  createdAt   DateTime    @default(now())
+
+  @@index([sessionId])
+}
+
+model Flashcard {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject        String
+  topic          String
+  frontText      String
+  backText       String
+  interval       Int      @default(1) // дней
+  easeFactor     Float    @default(2.5)
+  repetitions    Int      @default(0)
+  nextReviewDate DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  @@index([userId, nextReviewDate])
+}
+
+model ExamSimulation {
+  id               String   @id @default(uuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject          String
+  variantNumber    Int      @default(1)
+  targetScore      Int
+  actualScore      Int?
+  timeSpentSeconds Int      @default(0)
+  answers          String   // JSON строка
+  feedback         String?  // JSON строка
+  status           String   @default("IN_PROGRESS") // COMPLETED | IN_PROGRESS
+  createdAt        DateTime @default(now())
+
+  @@index([userId, subject])
+}
+
+model ExamVariantCache {
+  id            String   @id @default(uuid())
+  subjectId     String
+  variantNumber Int
+  dataJson      String   // JSON-сериализованный ExamVariant
+  createdAt     DateTime @default(now())
+
+  @@index([subjectId])
+}
+
+model StudentTutorLink {
+  id         String   @id @default(uuid())
+  tutorId    String
+  studentId  String
+  status     String   @default("ACTIVE") // PENDING | ACTIVE
+  inviteCode String?
+  createdAt  DateTime @default(now())
+
+  tutor   User @relation("TutorLinks", fields: [tutorId], references: [id], onDelete: Cascade)
+  student User @relation("StudentLinks", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([tutorId, studentId])
+  @@index([tutorId])
+  @@index([studentId])
+}
+
+model AssignedWork {
+  id            String    @id @default(uuid())
+  tutorId       String
+  studentId     String
+  title         String
+  subject       String
+  variantData   String    // JSON строка варианта
+  deadline      DateTime
+  status        String    @default("ASSIGNED") // ASSIGNED | SUBMITTED | GRADED
+  score         Int?
+  tutorFeedback String?
+  studentAnswers String?  // JSON строка сданных ответов
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  tutor   User @relation("TutorAssigned", fields: [tutorId], references: [id], onDelete: Cascade)
+  student User @relation("StudentAssigned", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([tutorId])
+  @@index([studentId])
+}
+
+model TelegramNotificationLink {
+  id        String   @id @default(uuid())
+  userId    String
+  chatId    String?
+  role      String   @default("parent") // parent | student | tutor
+  token     String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model MistakeEntry {
+  id           String    @id @default(uuid())
+  userId       String
+  subject      String
+  taskNumber   Int
+  fipiId       String?
+  statement    String
+  userAnswer   String?
+  correctAnswer String?
+  explanation  String?
+  status       String    @default("UNRESOLVED") // UNRESOLVED | RESOLVED
+  createdAt    DateTime  @default(now())
+  resolvedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, subject])
+}
+
+model ClassGroup {
+  id         String   @id @default(uuid())
+  teacherId  String
+  name       String
+  grade      Int      @default(11)
+  subject    String
+  inviteCode String   @unique
+  createdAt  DateTime @default(now())
+
+  teacher User @relation("TeacherClasses", fields: [teacherId], references: [id], onDelete: Cascade)
+  members ClassMember[]
+
+  @@index([teacherId])
+}
+
+model ClassMember {
+  id        String   @id @default(uuid())
+  classId   String
+  studentId String
+  joinedAt  DateTime @default(now())
+
+  classGroup ClassGroup @relation(fields: [classId], references: [id], onDelete: Cascade)
+  student    User       @relation("StudentClassMembers", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([classId, studentId])
+  @@index([studentId])
+}
+
