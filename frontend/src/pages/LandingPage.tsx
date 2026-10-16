@@ -399,7 +399,6 @@ export function LandingPage() {
               </TechButton>
               <TechButton to="/auth" variant="ghost">Зарегистрироваться</TechButton>
             </div>
-            <p data-reveal className="mt-10 hud-tag">EGE.SYSTEM © 2027</p>
           </div>
         </section>
       </main>
