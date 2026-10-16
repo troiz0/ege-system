@@ -44,6 +44,7 @@ dev.log
 # Operating System & Editor configs
 .DS_Store
 Thumbs.db
+*.png
 .vscode/
 .idea/
 *.suo
