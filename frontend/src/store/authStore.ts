@@ -21,11 +21,27 @@ interface AuthState {
   logout: () => void;
 }
 
+function getInitialAuth(): { user: User | null; isAuthenticated: boolean } {
+  if (typeof window === 'undefined') return { user: null, isAuthenticated: false };
+  try {
+    const raw = localStorage.getItem('auth-storage');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.state?.user && parsed?.state?.isAuthenticated) {
+        return { user: parsed.state.user, isAuthenticated: true };
+      }
+    }
+  } catch {}
+  return { user: null, isAuthenticated: false };
+}
+
+const initialAuth = getInitialAuth();
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
-      user: null,
-      isAuthenticated: false,
+      user: initialAuth.user,
+      isAuthenticated: initialAuth.isAuthenticated,
       setUser: (user) => set({ user, isAuthenticated: !!user }),
       updateUserXp: (xp, level) =>
         set((state) => ({
