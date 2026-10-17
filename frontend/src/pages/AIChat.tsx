@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 import { errText } from '../lib/errors';
 import { useToastStore } from '../store/toastStore';
 import { LatexText } from '../components/LatexText';
+import { InteractivePlotter } from '../components/InteractivePlotter';
 import { FileText, MessagesSquare, Paperclip, Pencil, Send, Sparkles, Trash2, X, Mic, MicOff, Volume2, VolumeX, Check } from 'lucide-react';
 
 interface ChatSession {
@@ -31,6 +32,48 @@ interface ChatMsg {
 }
 
 const MAX_FILES = 10;
+
+/** Парсит сообщение и рендерит интерактивные параметрические графики InteractivePlotter */
+function ChatMessageContent({ content }: { content: string }) {
+  const parts: Array<{ type: 'text' | 'plotter'; text: string }> = [];
+  const plotterRegex = /```plotter\s*([\s\S]*?)```/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = plotterRegex.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push({ type: 'text', text: content.slice(lastIndex, match.index) });
+    }
+    parts.push({ type: 'plotter', text: match[1].trim() });
+    lastIndex = plotterRegex.lastIndex;
+  }
+  if (lastIndex < content.length) {
+    parts.push({ type: 'text', text: content.slice(lastIndex) });
+  }
+
+  if (parts.length === 0 || (parts.length === 1 && parts[0].type === 'text')) {
+    return (
+      <div className="whitespace-pre-wrap">
+        <LatexText content={content} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {parts.map((p, idx) => {
+        if (p.type === 'plotter') {
+          return <InteractivePlotter key={idx} config={p.text} />;
+        }
+        return (
+          <div key={idx} className="whitespace-pre-wrap">
+            <LatexText content={p.text} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 function parseAttachments(raw?: string | null): ChatAttachment[] {
   if (!raw) return [];
@@ -105,6 +148,7 @@ const QUICK_PROMPTS = [
   'Что мне сегодня учить по КИМ?',
   'В каких номерах КИМ у меня пробелы?',
   'Как решить задание №14 (уравнения)?',
+  'Покажи параметрический график (№18): f(x) = x^2 - 4*x + a и прямая x - 2',
 ];
 
 const GREETING: ChatMsg = {
@@ -162,9 +206,30 @@ export function AIChat() {
   }, [input]);
 
   useEffect(() => {
-    const locState = (location.state || {}) as { topic?: string; prompt?: string; autoSend?: boolean };
-    const incomingTopic = searchParams.get('topic') || locState.topic || null;
-    const incomingPrompt = searchParams.get('prompt') || locState.prompt || (incomingTopic ? `Объясни тему ${incomingTopic}` : null);
+    const locState = (location.state || {}) as {
+      topic?: string;
+      topicName?: string;
+      subject?: string;
+      prompt?: string;
+      autoPrompt?: string;
+      autoSend?: boolean;
+    };
+    const rawTopic =
+      searchParams.get('topic') ||
+      locState.topic ||
+      locState.topicName ||
+      (locState.autoPrompt ? 'Разбор темы' : null);
+
+    const incomingTopic = rawTopic
+      ? (rawTopic.startsWith('Разбор:') ? rawTopic : `Разбор: ${rawTopic}`)
+      : null;
+
+    const incomingPrompt =
+      searchParams.get('prompt') ||
+      locState.autoPrompt ||
+      locState.prompt ||
+      (incomingTopic ? `Объясни тему ${incomingTopic}` : null);
+
     const shouldAutoSend = locState.autoSend ?? !!incomingPrompt;
 
     if (incomingTopic && processedKeyRef.current !== location.key) {
@@ -740,9 +805,7 @@ export function AIChat() {
                 <div key={m.id ?? i} className="flex justify-end">
                   <div className="max-w-[85%] border border-white/10 bg-white/[0.05] px-4 py-2.5 text-sm font-light leading-relaxed text-zinc-100">
                     <MessageAttachments items={m.attachments ?? []} />
-                    <div className="whitespace-pre-wrap">
-                      <LatexText content={m.content} />
-                    </div>
+                    <ChatMessageContent content={m.content} />
                   </div>
                 </div>
               ) : (
@@ -751,9 +814,7 @@ export function AIChat() {
                     <Sparkles className="h-4 w-4" />
                   </span>
                   <div className="max-w-[85%] border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-light leading-relaxed text-zinc-200">
-                    <div className="whitespace-pre-wrap">
-                      <LatexText content={m.content} />
-                    </div>
+                    <ChatMessageContent content={m.content} />
                     <div className="mt-2.5 pt-1.5 border-t border-white/[0.06] flex items-center justify-between text-[10px] font-mono text-zinc-500">
                       <span>РЕПЕТИТОР // AI_VOICE</span>
                       <button

@@ -110,6 +110,24 @@ export const sosSchema = z.object({
   algorithm: z.array(sosAlgorithmStepSchema).min(1).max(8),
 });
 
+export const appealRiskSchema = z.object({
+  riskLevel: z.enum(['LOW', 'MEDIUM', 'HIGH']),
+  verdictTitle: z.string(),
+  riskPercentage: z.number().min(0).max(100),
+  summary: z.string(),
+  upside: z.object({
+    potentialDelta: z.number(),
+    arguments: z.array(z.string()),
+    criteriaAnalysis: z.string(),
+  }),
+  downside: z.object({
+    riskDelta: z.number(),
+    vulnerabilities: z.array(z.string()),
+    hiddenRisks: z.string(),
+  }),
+  commissionStrategy: z.string(),
+});
+
 export type AnalysisAiResult = z.infer<typeof analysisAiSchema>;
 export type ScheduleAiResult = z.infer<typeof scheduleAiSchema>;
 export type HomeworkAiResult = z.infer<typeof homeworkAiSchema>;
@@ -122,3 +140,4 @@ export type TrainerGenerateResult = z.infer<typeof trainerGenerateSchema>;
 export type TrainerVerifyAiResult = z.infer<typeof trainerVerifySchema>;
 export type FipiCheckResult = z.infer<typeof fipiCheckSchema>;
 export type SosSummaryResult = z.infer<typeof sosSchema>;
+export type AppealRiskResult = z.infer<typeof appealRiskSchema>;

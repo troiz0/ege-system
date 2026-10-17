@@ -3,7 +3,8 @@ import { z } from 'zod';
 import { requireAuth } from '../middleware/requireAuth';
 import { prisma } from '../lib/prisma';
 import { differenceInDays, differenceInWeeks } from 'date-fns';
-import { toCanonicalModelSlug, isAllowedModel } from '../config/models';
+import { toCanonicalModelSlug, isAllowedModel } from '../config/models.js';
+import { calculateLevelTelemetry } from '../services/gamificationService.js';
 
 const router = Router();
 
@@ -93,6 +94,10 @@ router.get('/', requireAuth, async (req, res) => {
     const remainingDays = Math.max(0, differenceInDays(endDate, now));
     const remainingWeeks = Math.max(0, Math.floor(differenceInWeeks(endDate, now)));
 
+    const userXp = freshUser?.xp ?? 0;
+    const userLevel = freshUser?.level ?? 1;
+    const gamification = calculateLevelTelemetry(userXp, userLevel);
+
     return res.json({
       profile: {
         ...profile,
@@ -103,8 +108,9 @@ router.get('/', requireAuth, async (req, res) => {
       selectedAiModel: toCanonicalModelSlug(freshUser?.selectedAiModel ?? user.selectedAiModel),
       role: freshUser?.role || 'student',
       targetTrack: freshUser?.targetTrack || 'SOLID_85',
-      xp: freshUser?.xp ?? 0,
-      level: freshUser?.level ?? 1,
+      xp: userXp,
+      level: userLevel,
+      gamification,
       onboardingCompleted: freshUser?.onboardingCompleted ?? false,
     });
   } catch (error) {

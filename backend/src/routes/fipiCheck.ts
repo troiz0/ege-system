@@ -2,7 +2,9 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { chatJson } from '../services/ai/openrouterClient.js';
-import { fipiCheckSchema } from '../ai/schemas.js';
+import { fipiCheckSchema, appealRiskSchema } from '../ai/schemas.js';
+import { prisma } from '../lib/prisma.js';
+import { awardUserXp } from '../services/xpService.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -226,6 +228,123 @@ ${solutionText || '(Рукописное решение прикреплено �
       return res.status(400).json({ error: 'Некорректные параметры решения', details: error.errors });
     }
     return res.status(500).json({ error: 'Ошибка проверки решения экспертом' });
+  }
+});
+
+// POST /api/fipi-check/appeal-risk (Двусторонний AI-анализ рисков апелляции: Upside vs Downside)
+router.post('/appeal-risk', requireAuth, handleUpload, async (req, res) => {
+  try {
+    const user = req.user!;
+    const subject = (req.body?.subject || 'Профильная математика').trim();
+    const taskNumber = (req.body?.taskNumber || '14').trim();
+    const currentScore = Number(req.body?.currentScore ?? 0);
+    const maxScore = Number(req.body?.maxScore ?? 2);
+    const taskText = (req.body?.taskText || 'Задание развернутой части КИМ ЕГЭ').trim();
+    const solutionText = (req.body?.solutionText || '').trim();
+    const studentComment = (req.body?.studentComment || '').trim();
+
+    const uploadedFiles = (req.files as Express.Multer.File[]) || [];
+    const fileUrls = uploadedFiles.map((f) => `/uploads/${f.filename}`);
+
+    const base64Images: string[] = [];
+    for (const f of uploadedFiles) {
+      try {
+        const filePath = path.resolve(f.path || path.join(uploadDir, f.filename));
+        if (fs.existsSync(filePath)) {
+          const mime = f.mimetype || 'image/jpeg';
+          if (mime.startsWith('image/')) {
+            const buf = fs.readFileSync(filePath);
+            base64Images.push(`data:${mime};base64,${buf.toString('base64')}`);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to read scan for vision API:', err);
+      }
+    }
+
+    const systemPrompt = `Ты — председатель Конфликтной комиссии ЕГЭ по предмету "${subject}" и ведущий эксперт ФИПИ.
+Ученик планирует подать официальную апелляцию о несогласии с выставленными баллами за задание ${taskNumber}.
+Текущий выставленный первичный балл: ${currentScore} из ${maxScore}.
+
+ТВОЯ ЗАДАЧА — провести БЕСПРИСТРАСТНЫЙ ДВУСТОРОННИЙ АУДИТ РИСКОВ:
+1. ПОТЕНЦИАЛ ПОВЫШЕНИЯ (Upside):
+   - Есть ли в работе спорные моменты, где проверяющий эксперт проявил излишнюю строгость или не заметил альтернативного верного способа решения?
+   - За что конкретно (по критериям ФИПИ К1, К2 и т.д.) можно отвоевать +1 или +2 балла?
+2. РИСК ПОНИЖЕНИЯ (Downside):
+   - ПРИНЦИП КОНФЛИКТНОЙ КОМИССИИ: работа перепроверяется ЦЕЛИКОМ, и комиссия вправе как повысить, так и ПОНИЗИТЬ балл.
+   - Нет ли в решении других незамеченных экспертом дефектов (скрытая арифметика, нестрогие переходы, пропущенная ОДЗ, ошибки в терминологии), из-за которых комиссия СНИМЕТ балл?
+3. ВЕРДИКТ И ШКАЛА РИСКА:
+   - Если риск понижения велик (найдена скрытая ошибка): "riskLevel": "HIGH", "verdictTitle": "[ ОПАСНО: ВЫСОКИЙ РИСК ПОТЕРИ БАЛЛА ]", "riskPercentage": 75-95.
+   - Если риска снижения нет, а аргументы железобетонные: "riskLevel": "LOW", "verdictTitle": "[ НИЗКИЙ РИСК: ПОДАВАТЬ ]", "riskPercentage": 10-25.
+   - Если аргументы спорные и зависят от субъективного взгляда: "riskLevel": "MEDIUM", "verdictTitle": "[ УМЕРЕННЫЙ РИСК: ТРЕБУЕТ ВЗВЕШИВАНИЯ ]", "riskPercentage": 40-60.
+4. СТРАТЕГИЯ ДЛЯ КОМИССИИ:
+   - Конкретные фразы и ссылки на методические рекомендации ФИПИ-2027 для аргументации перед экспертами.
+
+Верни ответ СТРОГО в JSON формате:
+{
+  "riskLevel": "LOW" | "MEDIUM" | "HIGH",
+  "verdictTitle": "[ НИЗКИЙ РИСК: ПОДАВАТЬ ]" | "[ ОПАСНО: ВЫСОКИЙ РИСК ПОТЕРИ БАЛЛА ]",
+  "riskPercentage": 20,
+  "summary": "Краткое резюме аудита",
+  "upside": {
+    "potentialDelta": 1,
+    "arguments": ["аргумент 1", "аргумент 2"],
+    "criteriaAnalysis": "подробный критериальный разбор потенциала"
+  },
+  "downside": {
+    "riskDelta": 0,
+    "vulnerabilities": ["уязвимость 1"],
+    "hiddenRisks": "подробный разбор скрытых угроз работы"
+  },
+  "commissionStrategy": "Сценарий защиты на апелляции со ссылками на ФИПИ"
+}`;
+
+    let userPrompt = `Предмет: ${subject}
+Задание: ${taskNumber}
+Выставленный балл: ${currentScore} / ${maxScore}
+Условие задачи:
+${taskText}
+
+Решение ученика (текст/транскрипция):
+${solutionText || '(Скан рукописного чистовика прикреплен)'}`;
+
+    if (studentComment) {
+      userPrompt += `\n\nКомментарий ученика (почему не согласен с баллом):\n${studentComment}`;
+    }
+
+    if (fileUrls.length > 0) {
+      userPrompt += `\n\nПрикреплено сканов чистовика: ${fileUrls.length}. Проанализируй изображения рукописного решения.`;
+    }
+
+    const result = await chatJson({
+      user,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      images: base64Images.length > 0 ? base64Images : undefined,
+      schema: appealRiskSchema,
+      mockType: 'appeal',
+    });
+
+    // Начисляем +15 XP за аудит работы перед апелляцией
+    const xpStats = await awardUserXp(prisma, user.id, 15, 'Аудит рисков апелляции');
+
+    return res.json({
+      ...result.data,
+      attachmentUrls: fileUrls,
+      demoMode: result.demoMode,
+      notice: result.notice,
+      xpAwarded: 15,
+      newXp: xpStats?.xp,
+      newLevel: xpStats?.level,
+    });
+  } catch (error) {
+    console.error('Appeal risk audit error:', error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Некорректные параметры аудита', details: error.errors });
+    }
+    return res.status(500).json({ error: 'Ошибка анализа рисков апелляции' });
   }
 });
 

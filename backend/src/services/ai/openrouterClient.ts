@@ -7,7 +7,19 @@ import { FREE_AI_MODEL } from '../../config/aiDefaults.js';
 import { getModelProviderConfig } from '../../config/models.js';
 import { prisma } from '../../lib/prisma.js';
 import { getKeyUsage } from '../openrouterKeys.js';
-import { MOCK_ANALYSIS, MOCK_SCHEDULE, MOCK_HOMEWORK, MOCK_ATTACHMENT, MOCK_EXPLAIN, MOCK_MATERIAL, MOCK_VERDICT, MOCK_TRAINER_GENERATE, MOCK_FIPI_CHECK, MOCK_SOS } from './mocks.js';
+import {
+  MOCK_ANALYSIS,
+  MOCK_SCHEDULE,
+  MOCK_HOMEWORK,
+  MOCK_ATTACHMENT,
+  MOCK_EXPLAIN,
+  MOCK_MATERIAL,
+  MOCK_VERDICT,
+  MOCK_TRAINER_GENERATE,
+  MOCK_FIPI_CHECK,
+  MOCK_SOS,
+  MOCK_APPEAL_RISK,
+} from './mocks.js';
 import { errText } from '../../lib/errors.js';
 import { aiCache } from './aiCache.js';
 
@@ -58,7 +70,7 @@ export interface ChatJsonOptions<T> {
   messages: ChatMessage[];
   schema: ZodSchema<T>;
   images?: string[]; // base64 data URLs
-  mockType?: 'analysis' | 'schedule' | 'homework' | 'attachment' | 'explain' | 'material' | 'verdict' | 'trainer' | 'fipi' | 'sos';
+  mockType?: 'analysis' | 'schedule' | 'homework' | 'attachment' | 'explain' | 'material' | 'verdict' | 'trainer' | 'fipi' | 'sos' | 'appeal';
   maxTokens?: number;
 }
 
@@ -80,6 +92,7 @@ function getMockForType<T>(mockType?: string): T {
     case 'trainer': return MOCK_TRAINER_GENERATE as unknown as T;
     case 'fipi': return MOCK_FIPI_CHECK as unknown as T;
     case 'sos': return MOCK_SOS as unknown as T;
+    case 'appeal': return MOCK_APPEAL_RISK as unknown as T;
     default: return MOCK_ANALYSIS as unknown as T;
   }
 }
@@ -87,6 +100,28 @@ function getMockForType<T>(mockType?: string): T {
 
 export const MOCK_CHAT_REPLY =
   'Привет! Я твой эксперт ЕГЭ и ментор по поступлению. Над какими номерами КИМ или сложными темами работаем сегодня? Можем разобрать критерии второй части, решить тестовые задания или разобрать ошибки.';
+
+export function getMockChatReply(userMessage?: string): string {
+  const norm = (userMessage || '').toLowerCase();
+  if (norm.includes('параметр') || norm.includes('график') || norm.includes('plotter')) {
+    return `Вот параметрический анализ для задачи с параметром (№18 КИМ ЕГЭ):
+
+Исследуем взаимное расположение параболы $f(x) = x^2 - 4x + a$ и прямой $y = x - 2$.
+Уравнение точек пересечения:
+$$x^2 - 4x + a = x - 2 \\iff x^2 - 5x + (a + 2) = 0$$
+Дискриминант:
+$$D = 25 - 4(a + 2) = 17 - 4a$$
+- При $a < 4.25$ ($D > 0$) — ровно 2 точки пересечения;
+- При $a = 4.25$ ($D = 0$) — 1 точка касания;
+- При $a > 4.25$ ($D < 0$) — общих точек нет.
+
+\`\`\`plotter
+{ "fn": "x^2 - 4*x + a", "param": "a", "min": -5, "max": 5, "step": 0.1, "target": "x - 2" }
+\`\`\`
+Попробуй подвигать ползунок параметра **a** прямо в сообщении, чтобы увидеть смещение параболы и динамику корней!`;
+  }
+  return MOCK_CHAT_REPLY;
+}
 
 export interface ChatTextOptions {
   user: User;
@@ -102,13 +137,17 @@ export interface ChatTextResult {
 
 /** Текстовый чат без JSON-схемы (для AI-Чата): с гейтом лимитов и демо-фолбэком. */
 export async function chatText({ user, messages, images }: ChatTextOptions): Promise<ChatTextResult> {
+  const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+  const lastUserText = typeof lastUserMsg?.content === 'string' ? lastUserMsg.content : '';
+  const currentMock = getMockChatReply(lastUserText);
+
   if (user.isDemo) {
-    return { reply: MOCK_CHAT_REPLY, demoMode: true, notice: 'Демо-режим: показан пример ответа' };
+    return { reply: currentMock, demoMode: true, notice: 'Демо-режим: показан пример ответа' };
   }
   const dbUser = await prisma.user.findUnique({ where: { id: user.id } });
-  if (!dbUser) return { reply: MOCK_CHAT_REPLY, demoMode: true, notice: 'Пользователь не найден' };
+  if (!dbUser) return { reply: currentMock, demoMode: true, notice: 'Пользователь не найден' };
   const gate = aiGate(dbUser);
-  if (!gate.ok) return { reply: MOCK_CHAT_REPLY, demoMode: true, notice: gate.notice };
+  if (!gate.ok) return { reply: currentMock, demoMode: true, notice: gate.notice };
 
   let apiKey: string | null = null;
   let model = user.selectedAiModel || FREE_AI_MODEL;
@@ -122,7 +161,7 @@ export async function chatText({ user, messages, images }: ChatTextOptions): Pro
   } else {
     apiKey = process.env.OPENROUTER_API_KEY || null;
   }
-  if (!apiKey) return { reply: MOCK_CHAT_REPLY, demoMode: true, notice: 'Ключ OpenRouter не настроен. Показан демо-ответ.' };
+  if (!apiKey) return { reply: currentMock, demoMode: true, notice: 'Ключ OpenRouter не настроен. Показан демо-ответ.' };
 
   // Изображения — мультимодально к последнему сообщению пользователя (OpenAI Vision)
   const finalMessages: ChatMessage[] = [...messages];
@@ -226,10 +265,10 @@ export async function chatText({ user, messages, images }: ChatTextOptions): Pro
     clearTimeout(timeoutId);
     if (!response.ok) {
       if (response.status === 402) {
-        return { reply: MOCK_CHAT_REPLY, demoMode: true, notice: 'Месячный лимит токенов исчерпан (100%). Показан демо-ответ.' };
+        return { reply: currentMock, demoMode: true, notice: 'Месячный лимит токенов исчерпан (100%). Показан демо-ответ.' };
       }
       if (response.status === 429) {
-        return { reply: MOCK_CHAT_REPLY, demoMode: true, notice: 'Слишком много запросов. Показан демо-ответ.' };
+        return { reply: currentMock, demoMode: true, notice: 'Слишком много запросов. Показан демо-ответ.' };
       }
       throw new Error(`OpenRouter error ${response.status}`);
     }

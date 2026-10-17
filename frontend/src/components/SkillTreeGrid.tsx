@@ -2,7 +2,8 @@
 // Интерактивная 2D Карта навыков и пробелов (Skill Tree / Roadmap) по кодификаторам ФИПИ
 
 import React, { useState, useMemo } from 'react';
-import { Search } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, Bot } from 'lucide-react';
 import { EGE_SUBJECTS } from '../lib/subjects';
 import {
   getSyllabusForSubject,
@@ -181,6 +182,21 @@ export const SkillTreeGrid: React.FC<SkillTreeGridProps> = ({
       })
       .filter((section) => section.topics.length > 0);
   }, [syllabus, searchQuery, statusFilter, weakTopics, masteryOverrides]);
+
+  const navigate = useNavigate();
+
+  const handleExplainWithAi = (topicTitle: string, subjectName: string) => {
+    const autoPrompt = `Привет! Я изучаю тему из кодификатора ЕГЭ: «${topicTitle}» (${subjectName}).\n1. Объясни мне суть темы простыми словами и дай ключевые формулы.\n2. Покажи 2 главные ловушки составителей КИМ в этой теме.\n3. Дай один типовой пример из ЕГЭ и разбери его по шагам.`;
+    navigate('/chat', {
+      state: {
+        topic: `Разбор: ${topicTitle}`,
+        topicName: topicTitle,
+        subject: subjectName,
+        autoPrompt,
+        autoSend: true,
+      },
+    });
+  };
 
   const handleOpenSos = (title: string, mastery: number) => {
     setActiveModalTopic({ title, mastery });
@@ -419,22 +435,33 @@ export const SkillTreeGrid: React.FC<SkillTreeGridProps> = ({
                             />
                           </div>
 
-                          {/* Кнопки действий: ЧИСТЫЙ ХАД, БЕЗ ЭМОДЗИ */}
-                          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/[0.06]">
-                            <button
-                              onClick={() => handleOpenSos(topic.title, masteryLevel)}
-                              className="py-2 px-2 border border-white/10 bg-white/[0.03] hover:border-white/25 hover:bg-white/[0.06] text-zinc-300 hover:text-white font-mono text-[11px] uppercase tracking-wider flex items-center justify-center transition-colors rounded-none"
-                              title="Открыть конспект и шпаргалку по теме"
-                            >
-                              [ ШПАРГАЛКА ]
-                            </button>
+                          {/* Кнопки действий: ЧИСТЫЙ ХАД */}
+                          <div className="flex flex-col gap-2 pt-2 border-t border-white/[0.06]">
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                onClick={() => handleOpenSos(topic.title, masteryLevel)}
+                                className="py-2 px-2 border border-white/10 bg-white/[0.03] hover:border-white/25 hover:bg-white/[0.06] text-zinc-300 hover:text-white font-mono text-[11px] uppercase tracking-wider flex items-center justify-center transition-colors rounded-none"
+                                title="Открыть конспект и шпаргалку по теме"
+                              >
+                                [ ШПАРГАЛКА ]
+                              </button>
+
+                              <button
+                                onClick={() => handleOpenQuiz(topic.title, masteryLevel)}
+                                className="py-2 px-2 bg-[#d4ff00] hover:bg-[#b8dd00] text-black font-mono font-bold text-[11px] uppercase tracking-wider flex items-center justify-center transition-colors rounded-none"
+                                title="Запустить блиц-тренировку из 3 задач на закрытие пробела"
+                              >
+                                [ БЛИЦ-ТЕСТ ]
+                              </button>
+                            </div>
 
                             <button
-                              onClick={() => handleOpenQuiz(topic.title, masteryLevel)}
-                              className="py-2 px-2 bg-[#d4ff00] hover:bg-[#b8dd00] text-black font-mono font-bold text-[11px] uppercase tracking-wider flex items-center justify-center transition-colors rounded-none"
-                              title="Запустить блиц-тренировку из 3 задач на закрытие пробела"
+                              onClick={() => handleExplainWithAi(topic.title, selectedSubject)}
+                              className="border border-white/10 bg-white/[0.03] text-zinc-300 hover:text-[#d4ff00] hover:border-[#d4ff00]/50 rounded-none text-xs px-3 py-1.5 font-mono uppercase flex items-center justify-center gap-1.5 transition-all w-full"
+                              title="Разобрать тему с ИИ-репетитором"
                             >
-                              [ БЛИЦ-ТЕСТ ]
+                              <Bot className="w-3.5 h-3.5 text-[#d4ff00]" />
+                              <span>[ РАЗОБРАТЬ С ИИ ]</span>
                             </button>
                           </div>
                         </div>

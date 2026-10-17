@@ -2,6 +2,7 @@
 // Интерактивная матрица кодификатора ФИПИ (Syllabus Tracker)
 
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   getTopicProgress,
   calculateSyllabusStats,
@@ -22,6 +23,7 @@ import {
   Flame,
   ChevronDown,
   ChevronUp,
+  Bot,
 } from 'lucide-react';
 
 interface FipiSyllabusTrackerProps {
@@ -95,6 +97,21 @@ export const FipiSyllabusTracker: React.FC<FipiSyllabusTrackerProps> = ({
       ...prev,
       [sectionId]: prev[sectionId] === undefined ? false : !prev[sectionId],
     }));
+  };
+
+  const navigate = useNavigate();
+
+  const handleExplainWithAi = (topicTitle: string, subjectName: string) => {
+    const autoPrompt = `Привет! Я изучаю тему из кодификатора ЕГЭ: «${topicTitle}» (${subjectName}).\n1. Объясни мне суть темы простыми словами и дай ключевые формулы.\n2. Покажи 2 главные ловушки составителей КИМ в этой теме.\n3. Дай один типовой пример из ЕГЭ и разбери его по шагам.`;
+    navigate('/chat', {
+      state: {
+        topic: `Разбор: ${topicTitle}`,
+        topicName: topicTitle,
+        subject: subjectName,
+        autoPrompt,
+        autoSend: true,
+      },
+    });
   };
 
   const handleOpenSos = (topic: SyllabusTopic, mastery: number) => {
@@ -418,6 +435,17 @@ export const FipiSyllabusTracker: React.FC<FipiSyllabusTrackerProps> = ({
                               />
                             </div>
                           </div>
+
+                          {/* Кнопка: Разобрать с ИИ */}
+                          <button
+                            type="button"
+                            onClick={() => handleExplainWithAi(topic.title, selectedSubject)}
+                            className="border border-white/10 bg-white/[0.03] text-zinc-300 hover:text-[#d4ff00] hover:border-[#d4ff00]/50 rounded-none text-xs px-3 py-1.5 font-mono uppercase flex items-center gap-1.5 transition-all"
+                            title="Открыть тему в AI-чате и сразу сгенерировать глубокий разбор"
+                          >
+                            <Bot className="w-3.5 h-3.5 text-[#d4ff00]" />
+                            <span>РАЗОБРАТЬ С ИИ</span>
+                          </button>
 
                           {/* Кнопка: SOS-Конспект */}
                           <button

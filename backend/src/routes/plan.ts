@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth } from '../middleware/requireAuth';
-import { prisma } from '../lib/prisma';
-import { generateStudyPlan } from '../services/planService';
+import { requireAuth } from '../middleware/requireAuth.js';
+import { prisma } from '../lib/prisma.js';
+import { generateStudyPlan } from '../services/planService.js';
 import { errText } from '../lib/errors.js';
 import { Prisma } from '@prisma/client';
+import { addXp } from '../services/gamificationService.js';
 
 const router = Router();
 
@@ -98,6 +99,55 @@ const updatePlanItemSchema = z
     message: 'Нужно передать isCompleted или targetDate',
   });
 
+// POST /api/study-plan/:id/complete или /api/plan/:id/complete — +50 XP
+router.post('/:id/complete', requireAuth, async (req, res) => {
+  try {
+    const user = req.user!;
+    const { id } = req.params;
+
+    const existing = await prisma.studyPlanItem.findUnique({ where: { id } });
+    if (!existing || existing.userId !== user.id) {
+      return res.status(404).json({ error: 'Элемент плана не найден' });
+    }
+
+    let gamification = null;
+    let item = existing;
+
+    if (!existing.isCompleted) {
+      item = await prisma.studyPlanItem.update({
+        where: { id },
+        data: { isCompleted: true },
+      });
+      gamification = await addXp(
+        user.id,
+        50,
+        `Выполнение темы в плане: ${existing.topic}`
+      );
+    }
+
+    const allItems = await prisma.studyPlanItem.findMany({
+      where: { userId: user.id },
+    });
+    const totalItems = allItems.length;
+    const completedItems = allItems.filter((i) => i.isCompleted).length;
+    const progressPercent = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+
+    return res.json({
+      item,
+      progress: {
+        total: totalItems,
+        completed: completedItems,
+        percent: progressPercent,
+      },
+      gamification,
+      message: gamification ? '[ +50 XP // ТЕМА ПЛАНА ВЫПОЛНЕНА ]' : 'Тема уже была отмечена',
+    });
+  } catch (error) {
+    console.error('Complete plan item error:', error);
+    return res.status(500).json({ error: 'Ошибка завершения элемента плана' });
+  }
+});
+
 router.patch('/:id', requireAuth, async (req, res) => {
   try {
     const user = req.user!;
@@ -107,6 +157,15 @@ router.patch('/:id', requireAuth, async (req, res) => {
     const existing = await prisma.studyPlanItem.findUnique({ where: { id } });
     if (!existing || existing.userId !== user.id) {
       return res.status(404).json({ error: 'Элемент плана не найден' });
+    }
+
+    let gamification = null;
+    if (data.isCompleted === true && !existing.isCompleted) {
+      gamification = await addXp(
+        user.id,
+        50,
+        `Выполнение темы в плане: ${existing.topic}`
+      );
     }
 
     const item = await prisma.studyPlanItem.update({
@@ -132,6 +191,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
         completed: completedItems,
         percent: progressPercent,
       },
+      gamification,
     });
   } catch (error) {
     console.error('Update plan item error:', error);

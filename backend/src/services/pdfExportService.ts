@@ -3,10 +3,12 @@ import { prisma } from '../lib/prisma.js';
 import { generateRandomExamVariant } from './fipiExamService.js';
 import { findSubjectConfig } from '../lib/subjects.js';
 import { isSubjectMatchingTarget } from '../lib/subjectMatcher.js';
+import { sanitizeMathText } from '../lib/mathSanitizer.js';
 
 function renderRichText(content: string): string {
   if (!content) return '';
-  const parts = content.split(/(\$\$[\s\S]*?\$\$|\$[^$]+?\$)/g);
+  const sanitized = sanitizeMathText(content);
+  const parts = sanitized.split(/(\$\$[\s\S]*?\$\$|\$[^$]+?\$)/g);
   return parts
     .map((part) => {
       const isBlock = part.startsWith('$$') && part.endsWith('$$') && part.length >= 4;

@@ -22,6 +22,9 @@ import {
   Clock,
   BookX,
   Users,
+  Swords,
+  Scale,
+  ShieldCheck,
 } from 'lucide-react';
 import { Badge } from './ui/Badge';
 
@@ -40,6 +43,7 @@ const menuGroups = [
       { path: '/homework', icon: ClipboardList, label: 'Задания', code: 'HW' },
       { path: '/mesh-diary', icon: School, label: 'Дневник МЭШ', code: 'MESH' },
       { path: '/chat', icon: MessageSquare, label: 'AI-Чат', code: 'CHAT' },
+      { path: '/arena', icon: Swords, label: 'PvP Арена', code: 'PVP' },
     ],
   },
   {
@@ -48,6 +52,8 @@ const menuGroups = [
       { path: '/tests', icon: FileText, label: 'Оценки', code: 'TST' },
       { path: '/mock-exams', icon: Target, label: 'Пробники', code: 'MOCK' },
       { path: '/exam-pressure', icon: Clock, label: 'Симулятор экзамена', code: 'EXAM' },
+      { path: '/expert-mode', icon: ShieldCheck, label: 'ЕГЭ-Эксперт', code: 'EXPR' },
+      { path: '/appeal-calculator', icon: Scale, label: 'Апелляция', code: 'APPL' },
       { path: '/mistakes', icon: BookX, label: 'Книга ошибок', code: 'ERR' },
     ],
   },

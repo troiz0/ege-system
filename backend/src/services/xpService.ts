@@ -1,35 +1,30 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { prisma as defaultPrisma } from '../lib/prisma.js';
+import { addXp, getLevelFromXp } from './gamificationService.js';
 
 export function calculateLevel(xp: number): number {
-  return Math.max(1, Math.floor(xp / 100) + 1);
+  return getLevelFromXp(xp);
 }
 
 export async function awardUserXp(
   client: PrismaClient | Prisma.TransactionClient = defaultPrisma,
   userId: string,
-  xpToAdd: number
+  xpToAdd: number,
+  reason: string = 'Активность на платформе'
 ) {
-  const user = await client.user.findUnique({
-    where: { id: userId },
-    select: { id: true, xp: true, level: true },
-  });
-  if (!user) return null;
-
-  const currentXp = user.xp || 0;
-  const newXp = Math.max(0, currentXp + xpToAdd);
-  const newLevel = calculateLevel(newXp);
-
-  return client.user.update({
-    where: { id: userId },
-    data: {
-      xp: newXp,
-      level: newLevel,
-    },
-    select: {
-      id: true,
-      xp: true,
-      level: true,
-    },
-  });
+  try {
+    const result = await addXp(userId, xpToAdd, reason, client);
+    return {
+      id: userId,
+      xp: result.xp,
+      level: result.level,
+      xpEarned: result.xpEarned,
+      leveledUp: result.leveledUp,
+      levelProgressPercent: result.levelProgressPercent,
+      xpToNextLevel: result.xpToNextLevel,
+    };
+  } catch (error) {
+    console.error('awardUserXp error:', error);
+    return null;
+  }
 }

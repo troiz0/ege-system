@@ -4,6 +4,9 @@ import { requireAuth } from '../middleware/requireAuth.js';
 import { prisma } from '../lib/prisma.js';
 import { chatJson } from '../services/ai/openrouterClient.js';
 import { trainerGenerateSchema, trainerVerifySchema } from '../ai/schemas.js';
+import { awardUserXp } from '../services/xpService.js';
+import { EXPERT_SCENARIOS } from '../services/expertModeScenarios.js';
+import { addXp } from '../services/gamificationService.js';
 
 const router = Router();
 
@@ -139,12 +142,19 @@ router.post('/verify', requireAuth, async (req, res) => {
       },
     });
 
+    let gamification = null;
+    if (isMatch) {
+      gamification = await addXp(user.id, 10, `Блиц-тест: верный ответ по теме «${topic}»`);
+    }
+
     return res.json({
       isCorrect: isMatch,
       socraticFeedback,
       hint,
       correctAnswer,
       newMasteryLevel,
+      xpAwarded: isMatch ? 10 : 0,
+      gamification,
     });
   } catch (error) {
     console.error('Trainer verify error:', error);
@@ -250,6 +260,96 @@ router.post('/submit', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Некорректные параметры теста', details: error.errors });
     }
     return res.status(500).json({ error: 'Ошибка сохранения результатов блиц-теста' });
+  }
+});
+
+// =========================================================================
+// РЕЖИМ «ЕГЭ-ЭКСПЕРТ»: ПОИСК ОШИБОК И КРИТЕРИАЛЬНАЯ ВЕРИФИКАЦИЯ
+// =========================================================================
+
+// GET /api/trainer/expert/scenarios
+router.get('/expert/scenarios', requireAuth, async (req, res) => {
+  try {
+    const levelStr = req.query.level as string | undefined;
+    const subject = req.query.subject as string | undefined;
+
+    let list = [...EXPERT_SCENARIOS];
+    if (levelStr) {
+      const lvl = parseInt(levelStr, 10);
+      if (lvl >= 1 && lvl <= 3) {
+        list = list.filter((s) => s.level === lvl);
+      }
+    }
+    if (subject && subject !== 'all') {
+      list = list.filter((s) => s.subject === subject);
+    }
+    if (list.length === 0) {
+      list = [...EXPERT_SCENARIOS];
+    }
+
+    const sanitized = list.map((s) => ({
+      id: s.id,
+      subject: s.subject,
+      level: s.level,
+      taskNumber: s.taskNumber,
+      taskTitle: s.taskTitle,
+      condition: s.condition,
+      steps: s.steps,
+      criterionOptions: s.criterionOptions,
+      xpReward: s.xpReward,
+    }));
+    return res.json({ scenarios: sanitized });
+  } catch (err) {
+    console.error('Expert scenarios error:', err);
+    return res.status(500).json({ error: 'Ошибка получения протоколов эксперта' });
+  }
+});
+
+// POST /api/trainer/expert/verify
+const expertVerifySchema = z.object({
+  scenarioId: z.string(),
+  selectedStep: z.number().int(), // 1, 2, 3... or 0 for no error
+  selectedCriterionIndex: z.number().int(),
+});
+
+router.post('/expert/verify', requireAuth, async (req, res) => {
+  try {
+    const user = req.user!;
+    const { scenarioId, selectedStep, selectedCriterionIndex } = expertVerifySchema.parse(req.body);
+
+    const scenario = EXPERT_SCENARIOS.find((s) => s.id === scenarioId);
+    if (!scenario) {
+      return res.status(404).json({ error: 'Протокол задачи не найден' });
+    }
+
+    const isStepCorrect = scenario.correctErrorStep === selectedStep;
+    const isCriterionCorrect = scenario.correctCriterionIndex === selectedCriterionIndex;
+    const isFullSuccess = isStepCorrect && isCriterionCorrect;
+
+    let xpAwarded = 0;
+    let userStats = null;
+    if (isFullSuccess) {
+      xpAwarded = scenario.xpReward;
+      userStats = await awardUserXp(prisma, user.id, xpAwarded);
+    }
+
+    return res.json({
+      success: isFullSuccess,
+      isStepCorrect,
+      isCriterionCorrect,
+      correctErrorStep: scenario.correctErrorStep,
+      correctCriterionIndex: scenario.correctCriterionIndex,
+      xpAwarded,
+      newXp: userStats?.xp,
+      newLevel: userStats?.level,
+      fipiOfficialVerdict: scenario.fipiOfficialVerdict,
+    });
+  } catch (err) {
+    console.error('Expert verify error:', err);
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Некорректные параметры проверки', details: err.errors });
+    }
+    return res.status(500).json({ error: 'Ошибка проверки экспертного протокола' });
   }
 });
 

@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio';
 import { prisma } from '../lib/prisma.js';
 import { findSubjectConfig } from '../lib/subjects.js';
+import { sanitizeMathText } from '../lib/mathSanitizer.js';
 import {
   generateRandomExamVariant,
   type ExamTaskItem,
@@ -30,8 +31,18 @@ export const RESHU_EGE_SUBDOMAINS: Record<string, string> = {
  */
 export function sdamgiaAltToLatex(rawAlt: string): string {
   if (!rawAlt) return '';
-  // Удаляем мягкие переносы и невидимые спецсимволы
-  let s = rawAlt.replace(/[\u00AD\u200B]/g, '').replace(/[\u202F\u00A0]/g, ' ').trim();
+  // Очищаем речевой синтез и спецсимволы
+  let s = sanitizeMathText(rawAlt).replace(/[\u00AD\u200B]/g, '').replace(/[\u202F\u00A0]/g, ' ').trim();
+
+  // Поддержка вложенных корней (итеративный разбор изнутри наружу)
+  let prevRoot = '';
+  while (prevRoot !== s && /корень\s*из\s*:\s*начало\s*аргумента/i.test(s)) {
+    prevRoot = s;
+    s = s.replace(
+      /корень\s*из\s*:\s*начало\s*аргумента\s*:\s*((?:(?!корень\s*из\s*:\s*начало\s*аргумента)[\s\S])*?)\s*конец\s*аргумента/gi,
+      '\\sqrt{$1}'
+    );
+  }
 
   // Поддержка вложенных многоэтажных дробей (итеративный разбор изнутри наружу)
   let prevS = '';
@@ -62,6 +73,10 @@ export function sdamgiaAltToLatex(rawAlt: string): string {
     .replace(/правая фигурная скобка/gi, '\\}')
     .replace(/больше или равно/gi, '\\ge ')
     .replace(/меньше или равно/gi, '\\le ')
+    .replace(/не больше/gi, '\\le ')
+    .replace(/не меньше/gi, '\\ge ')
+    .replace(/строго больше|больше/gi, ' > ')
+    .replace(/строго меньше|меньше/gi, ' < ')
     .replace(/не равно/gi, '\\ne ')
     .replace(/равносильно/gi, '\\iff ')
     .replace(/умножить на|знак умножения/gi, '\\cdot ')
@@ -160,6 +175,49 @@ export function cleanHtmlToLatexText(
     }
   });
 
+  // Конвертируем HTML таблицы в KaTeX array до удаления тегов разметки
+  clone.find('table').each((_i: number, tableEl: cheerio.Element) => {
+    const $table = $(tableEl);
+    const rows: string[][] = [];
+    $table.find('tr').each((_r: number, trEl: cheerio.Element) => {
+      const row: string[] = [];
+      $(trEl).find('td, th').each((_c: number, cellEl: cheerio.Element) => {
+        let cellText = $(cellEl).text().trim();
+        cellText = cellText.replace(/[\u00AD\u200B]/g, '').replace(/[\u202F\u00A0]/g, ' ').trim();
+        row.push(cellText);
+      });
+      if (row.length > 0 && row.some((c) => c.length > 0)) {
+        rows.push(row);
+      }
+    });
+
+    if (rows.length > 0) {
+      const colCount = Math.max(...rows.map((r) => r.length));
+      const align = '|' + Array(colCount).fill('c').join('|') + '|';
+      const latexRows = rows
+        .map((r) => {
+          const padded = [...r];
+          while (padded.length < colCount) padded.push('');
+          return padded
+            .map((cell) => {
+              if (!cell) return '';
+              if (/[а-яА-Я]/.test(cell)) {
+                return `\\text{${cell}}`;
+              }
+              if (/^\d+,\d+$/.test(cell)) {
+                return cell.replace(',', '{,}');
+              }
+              return cell;
+            })
+            .join(' & ');
+        })
+        .join(' \\\\ \\hline\n');
+
+      const latexTable = `\n\n$$\\begin{array}{${align}}\n\\hline\n${latexRows} \\\\\n\\hline\n\\end{array}$$\n\n`;
+      $table.replaceWith(latexTable);
+    }
+  });
+
   // Сохраняем переносы строк для списков, пунктов условий и абзацев
   clone.find('br').replaceWith('\n');
   clone.find('p, div, tr, li, h1, h2, h3, h4, h5, h6').each((_i: number, el: cheerio.Element) => {
@@ -189,7 +247,7 @@ export function cleanHtmlToLatexText(
     .replace(/(\n\s*)+([а-я]\))/g, '\n\n$2')
     .trim();
 
-  return { text, imageUrl };
+  return { text: sanitizeMathText(text), imageUrl };
 }
 
 export class ReshuEgeService {

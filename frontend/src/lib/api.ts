@@ -43,7 +43,9 @@ import type {
   MistakeEntry,
   AssignedWork,
   TutorStudent,
+  GamificationTelemetry,
 } from './types';
+import { useAuthStore } from '../store/authStore';
 
 // '' (сборка для хостинга) => относительные /api-запросы к тому же origin
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
@@ -144,11 +146,28 @@ class ApiClient {
       profile: Partial<Profile>;
       targetSubjects?: TargetSubject[];
       selectedAiModel?: string;
+      role?: 'student' | 'tutor' | 'teacher';
+      targetTrack?: 'BASE_65' | 'SOLID_85' | 'OLYMP_95';
+      xp?: number;
+      level?: number;
+      gamification?: GamificationTelemetry;
+      onboardingCompleted?: boolean;
     }>('/api/profile');
 
     const p = data.profile ?? {};
+    const xp = data.xp ?? p.xp ?? 0;
+    const level = data.level ?? p.level ?? 1;
+
+    // Синхронизируем глобальное состояние пользователя в authStore
+    useAuthStore.getState().updateUserXp(xp, level);
+
     return {
       ...p,
+      xp,
+      level,
+      gamification: data.gamification,
+      targetTrack: data.targetTrack ?? (p.targetTrack as any) ?? 'SOLID_85',
+      role: data.role ?? p.role ?? 'student',
       grade: p.grade ?? 10,
       track: p.track ?? '',
       prepStartDate: p.prepStartDate ?? '',
@@ -169,18 +188,26 @@ class ApiClient {
         examDate: s.examDate ?? undefined,
       })),
       selectedAiModel: data.selectedAiModel ?? p.selectedAiModel ?? '',
+      onboardingCompleted: data.onboardingCompleted ?? false,
     };
   }
 
   async updateProfile(data: Partial<Profile>) {
-    return this.request<{
+    const res = await this.request<{
       profile: Profile;
       targetSubjects: TargetSubject[];
       selectedAiModel?: string;
+      xp?: number;
+      level?: number;
+      gamification?: GamificationTelemetry;
     }>('/api/profile', {
       method: 'PUT',
       body: JSON.stringify(data),
     });
+    if (typeof res.xp === 'number' && typeof res.level === 'number') {
+      useAuthStore.getState().updateUserXp(res.xp, res.level);
+    }
+    return res;
   }
 
   // Settings / Конфигурация подготовки по МЭШ
@@ -615,13 +642,24 @@ class ApiClient {
     id: string,
     patch: { isCompleted?: boolean; targetDate?: string }
   ) {
-    return this.request<{ item: unknown; progress: PlanResponse['progress'] }>(
+    return this.request<{ item: unknown; progress: PlanResponse['progress']; gamification?: any; message?: string }>(
       `/api/plan/${id}`,
       {
         method: 'PATCH',
         body: JSON.stringify(patch),
       }
     );
+  }
+
+  async completeStudyPlanItem(id: string) {
+    return this.request<{
+      item: unknown;
+      progress: PlanResponse['progress'];
+      gamification?: any;
+      message?: string;
+    }>(`/api/study-plan/${id}/complete`, {
+      method: 'POST',
+    });
   }
 
   // Analysis
@@ -800,6 +838,31 @@ class ApiClient {
     );
   }
 
+  async completeMatrixTest(params: {
+    subject?: string;
+    topic?: string;
+    correctCount?: number;
+    totalQuestions?: number;
+  }) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      xpEarned: number;
+      gamification: {
+        xp: number;
+        level: number;
+        currentLevelXp: number;
+        xpRequiredForLevel: number;
+        xpToNextLevel: number;
+        levelProgressPercent: number;
+        status: string;
+      };
+    }>('/api/matrix/test/complete', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
   // 2. AI-Эксперт проверки решений ФИПИ
   async checkFipiSolution(input: {
     subject: string;
@@ -941,6 +1004,16 @@ class ApiClient {
         deltaScore?: number | null;
         timeSpentSeconds: number;
       };
+      userXp?: {
+        id: string;
+        xp: number;
+        level: number;
+        xpEarned: number;
+        leveledUp: boolean;
+        levelProgressPercent: number;
+        xpToNextLevel: number;
+      };
+      xpAwarded?: number;
     }>('/api/exams/submit', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -1132,6 +1205,170 @@ class ApiClient {
     return this.request('/api/tutor/upload-scan', {
       method: 'POST',
       body: formData,
+    });
+  }
+
+  // РЕЖИМ «ЕГЭ-ЭКСПЕРТ»
+  async getExpertScenarios(params?: { level?: number; subject?: string }) {
+    const query = new URLSearchParams();
+    if (params?.level) query.set('level', String(params.level));
+    if (params?.subject) query.set('subject', params.subject);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return this.request<{
+      scenarios: Array<{
+        id: string;
+        subject: string;
+        level: 1 | 2 | 3;
+        taskNumber: string;
+        taskTitle: string;
+        condition: string;
+        steps: Array<{ stepNumber: number; title: string; content: string }>;
+        criterionOptions: string[];
+        xpReward: number;
+      }>;
+    }>(`/api/trainer/expert/scenarios${qs}`);
+  }
+
+  async verifyExpertSolution(params: {
+    scenarioId: string;
+    selectedStep: number;
+    selectedCriterionIndex: number;
+  }) {
+    return this.request<{
+      success: boolean;
+      isStepCorrect: boolean;
+      isCriterionCorrect: boolean;
+      correctErrorStep: number;
+      correctCriterionIndex: number;
+      xpAwarded: number;
+      newXp?: number;
+      newLevel?: number;
+      fipiOfficialVerdict: {
+        score: number;
+        maxScore: number;
+        primaryCriteria: string;
+        verdictText: string;
+        recommendation: string;
+      };
+    }>('/api/trainer/expert/verify', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  // AI-КАЛЬКУЛЯТОР РИСКОВ АПЕЛЛЯЦИИ
+  async checkAppealRisk(input: {
+    subject: string;
+    taskNumber: string;
+    currentScore: number;
+    maxScore?: number;
+    taskText?: string;
+    solutionText?: string;
+    studentComment?: string;
+    files?: File[];
+  }) {
+    const formData = new FormData();
+    formData.append('subject', input.subject);
+    formData.append('taskNumber', input.taskNumber);
+    formData.append('currentScore', String(input.currentScore));
+    if (input.maxScore !== undefined) formData.append('maxScore', String(input.maxScore));
+    if (input.taskText) formData.append('taskText', input.taskText);
+    if (input.solutionText) formData.append('solutionText', input.solutionText);
+    if (input.studentComment) formData.append('studentComment', input.studentComment);
+    if (input.files && input.files.length > 0) {
+      for (const file of input.files) {
+        formData.append('files', file);
+      }
+    }
+
+    return this.request<{
+      riskLevel: 'LOW' | 'MEDIUM' | 'HIGH';
+      verdictTitle: string;
+      riskPercentage: number;
+      summary: string;
+      upside: {
+        potentialDelta: number;
+        arguments: string[];
+        criteriaAnalysis: string;
+      };
+      downside: {
+        riskDelta: number;
+        vulnerabilities: string[];
+        hiddenRisks: string;
+      };
+      commissionStrategy: string;
+      attachmentUrls?: string[];
+      demoMode?: boolean;
+      notice?: string;
+      xpAwarded?: number;
+      newXp?: number;
+      newLevel?: number;
+    }>('/api/fipi-check/appeal-risk', {
+      method: 'POST',
+      body: formData,
+    });
+  }
+
+  // PVP BATTLEGROUND
+  async joinPvpQueue() {
+    return this.request<{
+      status: 'MATCH_FOUND' | 'WAITING';
+      matchId?: string;
+      waitTimeMs?: number;
+    }>('/api/pvp/queue', {
+      method: 'POST',
+    });
+  }
+
+  async leavePvpQueue() {
+    return this.request<{ status: 'LEFT' }>('/api/pvp/queue', {
+      method: 'DELETE',
+    });
+  }
+
+  async getPvpMatch(matchId: string) {
+    return this.request<{
+      matchId: string;
+      status: 'ACTIVE' | 'COMPLETED';
+      secondsLeft: number;
+      roundExpiresAt: number;
+      tasks: Array<{
+        id: number;
+        number: number;
+        title: string;
+        statement: string;
+        correctAnswer?: string;
+        explanation?: string;
+      }>;
+      self: {
+        userId: string;
+        userName: string;
+        solvedCount: number;
+        answers: Record<number, string>;
+      };
+      opponent: {
+        userId: string;
+        userName: string;
+        solvedCount: number;
+        currentTaskNum: number;
+      };
+      isWinner: boolean;
+      isDraw: boolean;
+      winnerId?: string | null;
+      xpAwarded?: number;
+      newLevel?: number;
+      newXp?: number;
+    }>(`/api/pvp/match/${matchId}`);
+  }
+
+  async submitPvpAnswer(matchId: string, taskIndex: number, answer: string) {
+    return this.request<{
+      isCorrect: boolean;
+      solvedCount: number;
+      allSolved: boolean;
+    }>(`/api/pvp/match/${matchId}/answer`, {
+      method: 'POST',
+      body: JSON.stringify({ taskIndex, answer }),
     });
   }
 }

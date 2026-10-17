@@ -28,6 +28,9 @@ const SchedulePage = lazy(() => import('./pages/SchedulePage'));
 const MeshDiaryPage = lazy(() => import('./pages/MeshDiaryPage'));
 const MaterialsPage = lazy(() => import('./pages/MaterialsPage'));
 const ExamPressureSimulatorPage = lazy(() => import('./pages/ExamPressureSimulatorPage'));
+const ExpertModePage = lazy(() => import('./pages/ExpertModePage'));
+const AppealCalculatorPage = lazy(() => import('./pages/AppealCalculatorPage'));
+const PvPArenaPage = lazy(() => import('./pages/PvPArenaPage'));
 
 function MainLayout() {
   const location = useLocation();
@@ -72,6 +75,10 @@ function MainLayout() {
               <Route path="/plan" element={<EgePlanPage />} />
               <Route path="/chat" element={<AIChat />} />
               <Route path="/exam-pressure" element={<ExamPressureSimulatorPage />} />
+              <Route path="/expert-mode" element={<ExpertModePage />} />
+              <Route path="/appeal-calculator" element={<AppealCalculatorPage />} />
+              <Route path="/arena" element={<PvPArenaPage />} />
+              <Route path="/pvp" element={<PvPArenaPage />} />
               <Route path="/tutor" element={<TutorDashboardPage />} />
               <Route path="/mistakes" element={<MistakesPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />

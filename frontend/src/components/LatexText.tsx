@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import katex from 'katex';
+import { sanitizeMathText } from '../lib/mathSanitizer';
 
 interface LatexTextProps {
   content?: string;
@@ -17,7 +18,7 @@ const LATEX_COMMAND_NAMES = new Set([
   'to', 'rightarrow', 'Rightarrow', 'Leftarrow', 'iff',
   'sum', 'prod', 'int', 'lim', 'vec', 'overrightarrow',
   'overline', 'underline', 'text', 'mathrm', 'left', 'right',
-  'circ', 'degree'
+  'circ', 'degree', 'begin', 'end', 'cases', 'array', 'gathered', 'matrix'
 ]);
 
 function isCyrillic(char: string): boolean {
@@ -69,7 +70,7 @@ export function wrapRawLatexInPlainText(text: string): string {
     let bracketDepth = 0;
     let parenDepth = 0;
 
-    for (let i = anchorStart; i < anchorEnd; i++) {
+    for (let i = start; i < anchorEnd; i++) {
       if (text[i] === '{') braceDepth++;
       if (text[i] === '}') braceDepth--;
       if (text[i] === '[') bracketDepth++;
@@ -141,7 +142,8 @@ export function wrapRawLatexInPlainText(text: string): string {
  */
 export function preprocessLatex(content: string): string {
   if (!content) return '';
-  const normalized = normalizeVectors(content);
+  const sanitized = sanitizeMathText(content);
+  const normalized = normalizeVectors(sanitized);
   const parts = normalized.split(/(\$\$[\s\S]*?\$\$|\$[^\$]+?\$)/g);
 
   return parts
@@ -168,12 +170,12 @@ export const LatexText: React.FC<LatexTextProps> = ({ content, text, className =
       {parts.map((part, index) => {
         if (part.startsWith('$$') && part.endsWith('$$')) {
           // Блочная формула
-          const math = part.slice(2, -2).trim();
+          const math = part.slice(2, -2).trim().replace(/^\$+|\$+$/g, '');
           try {
             const html = katex.renderToString(math, {
               displayMode: true,
               throwOnError: false,
-              errorColor: '#d4ff00',
+              errorColor: '#f87171',
             });
             return (
               <span
@@ -187,12 +189,12 @@ export const LatexText: React.FC<LatexTextProps> = ({ content, text, className =
           }
         } else if (part.startsWith('$') && part.endsWith('$')) {
           // Инлайн формула
-          const math = part.slice(1, -1).trim();
+          const math = part.slice(1, -1).trim().replace(/^\$+|\$+$/g, '');
           try {
             const html = katex.renderToString(math, {
               displayMode: false,
               throwOnError: false,
-              errorColor: '#d4ff00',
+              errorColor: '#f87171',
             });
             return (
               <span

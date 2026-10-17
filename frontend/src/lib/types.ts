@@ -59,7 +59,18 @@ export interface Profile {
   meshScheduleThrottlingEnabled?: boolean;
   xp?: number;
   level?: number;
+  gamification?: GamificationTelemetry;
   onboardingCompleted?: boolean;
+}
+
+export interface GamificationTelemetry {
+  xp: number;
+  level: number;
+  currentLevelXp: number;
+  xpRequiredForLevel: number;
+  xpToNextLevel: number;
+  levelProgressPercent: number;
+  status: string;
 }
 
 export interface MeshPrepSettings {
@@ -317,6 +328,8 @@ export interface TrainerVerifyResult {
   newMasteryLevel: number;
   hint?: string;
   correctAnswer: string;
+  xpAwarded?: number;
+  gamification?: GamificationTelemetry;
 }
 
 export interface FipiErrorItem {

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useToastStore } from '../store/toastStore';
+import { useAuthStore } from '../store/authStore';
 import { errText } from '../lib/errors';
 import { FipiSolutionChecker } from '../components/FipiSolutionChecker';
 import {
@@ -49,6 +50,11 @@ import type {
 import { findSubjectConfig, EGE_SUBJECTS } from '../lib/subjects';
 import { buildPacingPlan } from '../lib/examPacing';
 import { printBlanks, printVariant } from '../lib/examPrint';
+import {
+  saveOfflineExamState,
+  loadOfflineExamState,
+  clearOfflineExamState,
+} from '../lib/offlineExamStorage';
 
 type ExamPhase = 'LOBBY' | 'EXAM' | 'FINISHED';
 
@@ -200,12 +206,113 @@ export const ExamPressureSimulatorPage: React.FC = () => {
     secondsLeftRef.current = cfg.durationMinutes * 60;
   };
 
-  // Блокировка навигации во время экзамена (защита от случайного закрытия вкладки)
+  // Сетевой статус для Offline-First симулятора
+  const [isOnline, setIsOnline] = useState<boolean>(
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  );
+
+  // Восстановление сессии из IndexedDB при перезагрузке (F5) или повторном открытии вкладки
+  useEffect(() => {
+    async function restoreOfflineSession() {
+      try {
+        const saved = await loadOfflineExamState();
+        if (saved && saved.phase === 'EXAM' && saved.variant) {
+          const elapsedSec = Math.floor((Date.now() - saved.timestamp) / 1000);
+          const adjustedSeconds = Math.max(0, saved.secondsLeft - elapsedSec);
+
+          setVariant(saved.variant);
+          setPart1Answers(saved.part1Answers || {});
+          setPart2Solutions(saved.part2Solutions || {});
+          setSelectedSubjectKey(saved.selectedSubjectKey || 'math_profile');
+          setExamMode(saved.examMode || 'full');
+          if (saved.taskTimes) taskTimesRef.current = saved.taskTimes;
+          if (saved.activePart2Tab) setActivePart2Tab(saved.activePart2Tab);
+
+          secondsLeftRef.current = adjustedSeconds;
+          setPhase('EXAM');
+          setIsTimerRunning(adjustedSeconds > 0);
+
+          addToast(
+            'info',
+            `[ СЕССИЯ ВОССТАНОВЛЕНА ИЗ INDEXEDDB // ОСТАЛОСЬ: ${Math.floor(adjustedSeconds / 60)} мин ]`
+          );
+        }
+      } catch (e) {
+        console.warn('Failed to restore offline exam state:', e);
+      }
+    }
+    restoreOfflineSession();
+  }, [addToast]);
+
+  // Отслеживание сетевого статуса (online / offline)
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      addToast('success', '[ СВЯЗЬ ВОССТАНОВЛЕНА // ДАННЫЕ СИНХРОНИЗИРОВАНЫ ]');
+      // При восстановлении связи сразу сохраняем снимок
+      if (variant && phase === 'EXAM') {
+        saveOfflineExamState({
+          variant,
+          part1Answers,
+          part2Solutions,
+          secondsLeft: secondsLeftRef.current,
+          timestamp: Date.now(),
+          selectedSubjectKey,
+          examMode,
+          phase: 'EXAM',
+          taskTimes: taskTimesRef.current,
+          activePart2Tab,
+        }).catch(() => {});
+      }
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      addToast('error', '[ АВТОНОМНЫЙ РЕЖИМ // СЕТЬ ОТСУТСТВУЕТ // ДАННЫЕ В БЕЗОПАСНОСТИ ]');
+    };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [addToast, variant, phase, part1Answers, part2Solutions, selectedSubjectKey, examMode, activePart2Tab]);
+
+  // Автосохранение в IndexedDB при изменении ответов или сканов
+  useEffect(() => {
+    if (phase === 'EXAM' && variant) {
+      saveOfflineExamState({
+        variant,
+        part1Answers,
+        part2Solutions,
+        secondsLeft: secondsLeftRef.current,
+        timestamp: Date.now(),
+        selectedSubjectKey,
+        examMode,
+        phase: 'EXAM',
+        taskTimes: taskTimesRef.current,
+        activePart2Tab,
+      }).catch(() => {});
+    }
+  }, [phase, variant, part1Answers, part2Solutions, selectedSubjectKey, examMode, activePart2Tab]);
+
+  // Блокировка навигации и гарантированное сохранение в IndexedDB перед выгрузкой вкладки
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (phase === 'EXAM') {
+      if (phase === 'EXAM' && variant) {
+        saveOfflineExamState({
+          variant,
+          part1Answers,
+          part2Solutions,
+          secondsLeft: secondsLeftRef.current,
+          timestamp: Date.now(),
+          selectedSubjectKey,
+          examMode,
+          phase: 'EXAM',
+          taskTimes: taskTimesRef.current,
+          activePart2Tab,
+        }).catch(() => {});
         e.preventDefault();
-        e.returnValue = 'Экзамен в процессе! Несохраненные ответы будут потеряны. Вы уверены?';
+        e.returnValue = 'Экзамен в процессе! Прогресс сохранен в IndexedDB. Вы уверены?';
         return e.returnValue;
       }
     };
@@ -214,7 +321,7 @@ export const ExamPressureSimulatorPage: React.FC = () => {
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [phase]);
+  }, [phase, variant, part1Answers, part2Solutions, selectedSubjectKey, examMode, activePart2Tab]);
 
   // Актуальная версия обработчика сдачи для вызова из таймера (без устаревших замыканий)
   const submitRef = useRef<(isTimeUp?: boolean) => void>(() => {});
@@ -223,7 +330,23 @@ export const ExamPressureSimulatorPage: React.FC = () => {
     secondsLeftRef.current = currentSecondsLeft;
     const task = trackedTaskRef.current;
     taskTimesRef.current[task] = (taskTimesRef.current[task] || 0) + 1;
-  }, []);
+
+    // Регулярное обновление оставшегося времени в IndexedDB (каждые 5 сек)
+    if (currentSecondsLeft % 5 === 0 && variant && phase === 'EXAM') {
+      saveOfflineExamState({
+        variant,
+        part1Answers,
+        part2Solutions,
+        secondsLeft: currentSecondsLeft,
+        timestamp: Date.now(),
+        selectedSubjectKey,
+        examMode,
+        phase: 'EXAM',
+        taskTimes: taskTimesRef.current,
+        activePart2Tab,
+      }).catch(() => {});
+    }
+  }, [variant, phase, part1Answers, part2Solutions, selectedSubjectKey, examMode, activePart2Tab]);
 
   const handleTimerExpire = useCallback(() => {
     submitRef.current(true);
@@ -419,6 +542,12 @@ export const ExamPressureSimulatorPage: React.FC = () => {
       setTaskTimes({ ...taskTimesRef.current });
       setFinalSpentSeconds(timeSpent);
       setPhase('FINISHED');
+      await clearOfflineExamState();
+
+      if (res.userXp?.xp !== undefined && res.userXp?.level !== undefined) {
+        useAuthStore.getState().updateUserXp(res.userXp.xp, res.userXp.level);
+      }
+
       addToast(
         'success',
         `Экзамен сдан! Результат (${res.results.totalScore} / 100) сохранен в раздел Пробников (/mock-exams)`
@@ -477,6 +606,19 @@ export const ExamPressureSimulatorPage: React.FC = () => {
 
     return (
       <div className="mx-auto max-w-6xl space-y-8">
+        {!isOnline && (
+          <div className="bg-amber-500/10 border border-amber-500/50 text-amber-300 px-4 py-3 font-mono text-xs flex items-center justify-between rounded-none shadow-[0_0_20px_rgba(245,158,11,0.15)]">
+            <div className="flex items-center gap-2.5">
+              <span className="w-2.5 h-2.5 bg-amber-400 animate-ping" />
+              <span className="font-bold tracking-wider">
+                [ АВТОНОМНЫЙ РЕЖИМ // СЕТЬ ОТСУТСТВУЕТ // ДАННЫЕ В БЕЗОПАСНОСТИ ]
+              </span>
+            </div>
+            <span className="text-[10px] text-zinc-400 uppercase tracking-widest hidden sm:inline">
+              INDEXEDDB ХРАНИЛИЩЕ: АКТИВНО
+            </span>
+          </div>
+        )}
         {/* Шапка раздела в едином стиле сайта */}
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -1071,6 +1213,19 @@ export const ExamPressureSimulatorPage: React.FC = () => {
 
   return (
     <div className="w-full space-y-4 select-none">
+      {!isOnline && (
+        <div className="bg-amber-500/10 border border-amber-500/50 text-amber-300 px-4 py-2 font-mono text-xs flex items-center justify-between rounded-none shadow-[0_0_20px_rgba(245,158,11,0.15)] animate-pulse">
+          <div className="flex items-center gap-2.5">
+            <span className="w-2.5 h-2.5 bg-amber-400 animate-ping" />
+            <span className="font-bold tracking-wider">
+              [ АВТОНОМНЫЙ РЕЖИМ // СЕТЬ ОТСУТСТВУЕТ // ДАННЫЕ В БЕЗОПАСНОСТИ ]
+            </span>
+          </div>
+          <span className="text-[10px] text-zinc-400 uppercase tracking-widest hidden sm:inline">
+            ЛОКАЛЬНОЕ ХРАНИЛИЩЕ INDEXEDDB АКТИВНО // ТАЙМЕР ПРОДОЛЖАЕТ ИДТИ
+          </span>
+        </div>
+      )}
       {/* Экзаменационная шапка */}
       <header className="sticky top-0 z-30 bg-[#09090b]/95 border-b border-white/[0.1] -mx-4 -mt-4 md:-mx-8 md:-mt-8 px-4 md:px-8 py-3 backdrop-blur-md flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -1640,7 +1795,8 @@ export const ExamPressureSimulatorPage: React.FC = () => {
 
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
+                  await clearOfflineExamState();
                   setIsAbortConfirmOpen(false);
                   setIsTimerRunning(false);
                   setPhase('LOBBY');

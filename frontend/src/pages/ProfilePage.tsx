@@ -7,10 +7,11 @@ import { MeshConnectBanner } from '../components/MeshConnectBanner';
 import { MeshConnectedCard } from '../components/MeshConnectedCard';
 import { useToastStore } from '../store/toastStore';
 import { useAuthStore } from '../store/authStore';
-import { User, Calendar, Plus, Trash2, FileText, Shield, Bell } from 'lucide-react';
+import { User, Calendar, Plus, Trash2, FileText, Shield, Bell, Zap } from 'lucide-react';
 import type { AiModel, Profile } from '../lib/types';
 import { errText } from '../lib/errors';
 import { EGE_SUBJECTS_LIST } from '../lib/subjects';
+import { calculateClientLevelTelemetry } from '../lib/gamification';
 
 export function ProfilePage() {
   const navigate = useNavigate();
@@ -214,6 +215,10 @@ export function ProfilePage() {
   if (loading) return <LoadingPage />;
   if (!profile) return null;
 
+  const effectiveXp = profile.xp ?? user?.xp ?? 0;
+  const effectiveLevel = profile.level ?? user?.level ?? 1;
+  const lvlTelemetry = calculateClientLevelTelemetry(effectiveXp, effectiveLevel);
+
   return (
     <div className="mx-auto max-w-4xl">
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
@@ -320,6 +325,64 @@ export function ProfilePage() {
               <span className="ml-1 font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">
                 класс
               </span>
+            </div>
+          </div>
+        </div>
+
+        {/* [ ПРОКАЧКА // УРОВЕНЬ И ОПЫТ ] */}
+        <div className="card-shelf mb-4 p-6 relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-[#d4ff00]/60" />
+          <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-[#d4ff00]/60" />
+          <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-[#d4ff00]/60" />
+          <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-[#d4ff00]/60" />
+
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <div className="flex items-center gap-2">
+              <Zap className="h-4 w-4 text-[#d4ff00]" />
+              <h3 className="font-display text-lg font-bold uppercase tracking-tight text-white">
+                Прокачка // Уровень и опыт
+              </h3>
+            </div>
+            <span className="hud-tag !text-[9px]">[ GAMIFICATION ENGINE ]</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
+            {/* Слева: крупный бейдж текущего уровня и динамический статус */}
+            <div className="md:col-span-4 flex items-center gap-3">
+              <div className="px-3.5 py-2 bg-[#d4ff00]/10 border border-[#d4ff00]/40 font-mono font-black text-xl md:text-2xl text-[#d4ff00] rounded-none tracking-tight whitespace-nowrap">
+                LVL [ {lvlTelemetry.level} ]
+              </div>
+              <div>
+                <span className="font-mono text-[10px] text-zinc-500 uppercase block tracking-wider">
+                  СТАТУС УЧЕНИКА
+                </span>
+                <span className="font-mono text-xs font-bold text-white tracking-widest uppercase">
+                  {lvlTelemetry.status}
+                </span>
+              </div>
+            </div>
+
+            {/* По центру: полоса прогресса уровня */}
+            <div className="md:col-span-5 flex flex-col justify-center">
+              <div className="flex justify-between items-center mb-1.5 font-mono text-xs text-zinc-300">
+                <span className="text-zinc-400">ПРОГРЕСС УРОВНЯ</span>
+                <span className="text-white font-semibold">
+                  {lvlTelemetry.currentLevelXp} / {lvlTelemetry.xpRequiredForLevel} XP ({lvlTelemetry.levelProgressPercent}%)
+                </span>
+              </div>
+              <div className="w-full bg-zinc-800 h-2 rounded-none overflow-hidden">
+                <div
+                  className="bg-[#d4ff00] h-full transition-all"
+                  style={{ width: `${lvlTelemetry.levelProgressPercent}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Справа счетчик */}
+            <div className="md:col-span-3 flex md:justify-end">
+              <div className="w-full md:w-auto px-3 py-2 bg-white/[0.02] border border-white/10 font-mono text-[11px] text-zinc-300 text-center tracking-wider">
+                [ ДО СЛЕДУЮЩЕГО УРОВНЯ: ЕЩЕ {lvlTelemetry.xpToNextLevel} XP ]
+              </div>
             </div>
           </div>
         </div>

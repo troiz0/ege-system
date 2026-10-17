@@ -382,13 +382,20 @@ router.post('/submit', requireAuth, async (req, res) => {
         },
       });
 
-      // 5. Начисление XP за симуляцию экзамена (+30 XP)
-      const updatedUser = await awardUserXp(tx, user.id, 30);
+      // 5. Начисление динамического бонуса XP в зависимости от результата (primaryScore * 10, до 330 XP)
+      const dynamicXp = Math.min(330, Math.max(0, totalPrimaryScore * 10));
+      const updatedUser = await awardUserXp(
+        tx,
+        user.id,
+        dynamicXp,
+        `Пробник в Симуляторе экзамена: ${totalPrimaryScore} первичных баллов`
+      );
 
       return {
         mockExam: createdMockExam,
         simulation: createdSimulation,
         userXp: updatedUser,
+        xpAwarded: dynamicXp,
       };
     });
 

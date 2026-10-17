@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 import { LatexText } from './LatexText';
 import { useToastStore } from '../store/toastStore';
+import { useAuthStore } from '../store/authStore';
 import { errText } from '../lib/errors';
 import { X, CheckCircle2, AlertTriangle, ArrowRight, RefreshCw, Zap, ShieldCheck } from 'lucide-react';
 import type { TrainerQuizQuestion, TrainerVerifyResult } from '../lib/types';
@@ -99,7 +100,10 @@ export const TargetedQuizModal: React.FC<TargetedQuizModalProps> = ({
       }
       if (res.isCorrect) {
         setCorrectCount((prev) => prev + 1);
-        addToast('success', 'Ответ верен! Уровень освоения повышен.');
+        if (res.gamification) {
+          useAuthStore.getState().updateUserXp(res.gamification.xp, res.gamification.level);
+        }
+        addToast('success', '[ +10 XP // ВЕРНЫЙ ОТВЕТ ]');
       }
     } catch (e) {
       addToast('error', errText(e) || 'Ошибка проверки ответа');
@@ -115,7 +119,7 @@ export const TargetedQuizModal: React.FC<TargetedQuizModalProps> = ({
       setCustomAnswer('');
       setCurrentIndex((prev) => prev + 1);
     } else {
-      // Завершение теста: отправляем итоговый результат на бэкенд
+      // Завершение теста: отправляем итоговый результат на бэкенд и начисляем XP
       setSubmitting(true);
       try {
         const res = await api.submitTrainerQuiz({
@@ -128,11 +132,30 @@ export const TargetedQuizModal: React.FC<TargetedQuizModalProps> = ({
         if (onMasteryUpdated) {
           onMasteryUpdated(res.newMasteryLevel);
         }
-        const percent = Math.round((correctCount / questions.length) * 100);
-        addToast(
-          'success',
-          `Блиц-тест завершен! Результат: ${correctCount}/${questions.length} (${percent}%). Прогресс сохранен в базу данных.`
-        );
+
+        if (correctCount > 0) {
+          try {
+            const matrixRes = await api.completeMatrixTest({
+              subject,
+              topic,
+              correctCount,
+              totalQuestions: questions.length,
+            });
+            if (matrixRes.gamification) {
+              useAuthStore.getState().updateUserXp(matrixRes.gamification.xp, matrixRes.gamification.level);
+            }
+            addToast('success', '[ +30 XP // ТЕМА ОСВОЕНА ]');
+          } catch (e) {
+            console.warn('Matrix test complete error:', e);
+            const percent = Math.round((correctCount / questions.length) * 100);
+            addToast(
+              'success',
+              `Блиц-тест завершен! Результат: ${correctCount}/${questions.length} (${percent}%).`
+            );
+          }
+        } else {
+          addToast('info', 'Блиц-тест завершен.');
+        }
       } catch (err) {
         console.warn('Failed to submit trainer quiz:', err);
         addToast('info', 'Блиц-тест завершен.');
