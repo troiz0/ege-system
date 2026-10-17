@@ -88,7 +88,7 @@ export function MeshConnectedCard({ onUnlinked }: MeshConnectedCardProps) {
   };
 
   return (
-    <div className="mb-6 flex flex-col gap-4 p-5 bg-zinc-900/70 backdrop-blur border border-white/[0.08] rounded-none shadow-card animate-fade-up">
+    <div className="mb-6 flex flex-col gap-4 p-5 bg-zinc-900/70 backdrop-blur border border-white/[0.08] rounded-none shadow-none animate-fade-up">
       <div className="flex flex-col sm:flex-row sm:items-center gap-4">
         <div className="flex items-start gap-3.5 flex-1 min-w-0">
           <div className="w-11 h-11 rounded-none bg-green-500/10 border border-green-500/25 flex items-center justify-center flex-shrink-0">

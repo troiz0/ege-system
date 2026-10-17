@@ -14,18 +14,20 @@ export function PlatformFooter() {
                 EGE.SYSTEM
               </span>
             </Link>
-            <span className="font-mono text-[10px] tracking-[0.25em] text-zinc-500 uppercase">
-              // 2027
-            </span>
             <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-wider">
-              [ 152-ФЗ COMPLIANT // SECURE EDTECH ]
-            </span>
-            <span className="font-mono text-[10px] text-[#d4ff00] uppercase tracking-wider border border-[#d4ff00]/30 bg-[#d4ff00]/[0.06] px-2 py-0.5">
-              [ MIT LICENSE // OPEN SOURCE ]
+              [ OPEN SOURCE ]
             </span>
           </div>
 
           <nav className="flex flex-wrap items-center gap-4 md:gap-6 font-mono text-[11px] uppercase tracking-wider">
+            <a
+              href={`https://t.me/${import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'ege_system_bot'}?start=bug`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-zinc-400 hover:text-[#d4ff00] transition-colors"
+            >
+              [ СООБЩИТЬ ОБ ОШИБКЕ ]
+            </a>
             <Link
               to="/privacy"
               className="text-zinc-400 hover:text-[#d4ff00] transition-colors"
@@ -57,9 +59,9 @@ export function PlatformFooter() {
 
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-zinc-500 text-[11px] leading-relaxed">
           <p className="max-w-3xl">
-            <strong className="text-zinc-400">Дисклеймер:</strong> EGE.SYSTEM — независимая EdTech-платформа с открытым исходным кодом под лицензией MIT. 
-            Наименования ЕГЭ, ОГЭ, МЭШ и ФИПИ используются исключительно в информационных целях для описания 
-            структуры образовательных программ и спецификаций открытого банка заданий. Платформа не является 
+            <strong className="text-zinc-400">Дисклеймер:</strong> EGE.SYSTEM — независимая EdTech-платформа с открытым исходным кодом под лицензией MIT.
+            Наименования ЕГЭ, ОГЭ, МЭШ и ФИПИ используются исключительно в информационных целях для описания
+            структуры образовательных программ и спецификаций открытого банка заданий. Платформа не является
             подразделением ФГБНУ «ФИПИ» или Рособрнадзора.
           </p>
           <p className="font-mono text-[10px] uppercase tracking-widest text-zinc-500 shrink-0">

@@ -10,6 +10,7 @@ export interface AuthUser {
   email: string;
   name: string;
   avatarUrl?: string | null;
+  googleId?: string | null;
   subscriptionTier: SubscriptionTier;
   isDemo: boolean;
   proExpiresAt?: string | null;
@@ -19,6 +20,8 @@ export interface AuthUser {
   xp?: number;
   level?: number;
   onboardingCompleted?: boolean;
+  role?: string;
+  grade?: number | null;
 }
 
 export interface AuthResponse {
@@ -37,6 +40,13 @@ export interface TargetSubject {
 export interface Profile {
   id?: string;
   userId?: string;
+  email?: string;
+  authProvider?: string;
+  googleId?: string | null;
+  telegramId?: string | null;
+  telegramUsername?: string | null;
+  isBanned?: boolean;
+  banReason?: string | null;
   grade: number;
   track: string;
   prepStartDate: string;
@@ -380,9 +390,12 @@ export interface SosSummary {
 
 export interface AnalyticsTelemetry {
   predictor: {
-    minScore: number;
-    maxScore: number;
-    estimatedScore: number;
+    hasEnoughData?: boolean;
+    minScore: number | null;
+    maxScore: number | null;
+    estimatedScore: number | null;
+    predictedScore?: number | null;
+    scoreRange?: string | null;
     confidencePercent: number;
     trend: 'UP' | 'DOWN' | 'STABLE';
     meshAveragePercent: number;
@@ -513,6 +526,19 @@ export interface DashboardSummary {
     hours: number;
     formatted: string;
   };
+  targetSubjectScores?: Array<{
+    id: string;
+    subjectName: string;
+    targetScore: number;
+    currentEstimatedScore: number | null;
+    mockCount: number;
+    latestScore: number | null;
+    avgScore: number | null;
+    bestScore: number | null;
+    confirmedScore: number;
+  }>;
+  admissionTotalScore?: number;
+  targetSubjectsTotal?: number;
 }
 
 // Соответствует PublicModel в backend/src/config/models.ts

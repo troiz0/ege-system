@@ -363,7 +363,7 @@ export const KnowledgeGraph3D: React.FC<KnowledgeGraph3DProps> = ({
 
       {/* Выбранный узел (HUD карточка внизу слева) */}
       {selectedTopic && (
-        <div className="absolute bottom-4 left-4 right-4 md:right-auto md:w-96 z-20 bg-zinc-950/95 backdrop-blur-md border border-[#d4ff00]/40 p-4 shadow-2xl animate-fade-in">
+        <div className="absolute bottom-4 left-4 right-4 md:right-auto md:w-96 z-20 bg-zinc-950/95 backdrop-blur-md border border-[#d4ff00]/40 p-4 shadow-none animate-fade-in">
           <div className="flex items-start justify-between gap-2 border-b border-white/[0.08] pb-2.5 mb-3">
             <div>
               <span className="font-mono text-[10px] text-[#d4ff00] uppercase tracking-wider block">

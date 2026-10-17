@@ -3,6 +3,7 @@ import { api } from '../lib/api';
 import { LoadingPage } from '../components/ui/LoadingSpinner';
 import { EmptyState } from '../components/ui/EmptyState';
 import { useToastStore } from '../store/toastStore';
+import { hudConfirm } from '../store/confirmStore';
 import { Plus, FileText, Trash2, ImagePlus, X } from 'lucide-react';
 import { format } from 'date-fns';
 import type { TestResult } from '../lib/types';
@@ -127,7 +128,14 @@ export function TestsPage() {
   };
 
   const deleteTest = async (id: string) => {
-    if (!confirm('Удалить оценку?')) return;
+    const ok = await hudConfirm({
+      title: 'УДАЛЕНИЕ ОЦЕНКИ',
+      message: 'Вы уверены, что хотите удалить эту оценку?',
+      confirmText: '[ УДАЛИТЬ ]',
+      cancelText: '[ ОТМЕНА ]',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.deleteTest(id);
       addToast('success', 'Оценка удалена');

@@ -95,7 +95,7 @@ export const ExamPacingAssistant: React.FC<LiveProps> = ({
         <button
           type="button"
           onClick={() => setCollapsed((v) => !v)}
-          className="ml-auto border border-white/[0.1] p-1 text-zinc-400 transition-all hover:border-[#d4ff00]/50 hover:text-[#d4ff00] hover:shadow-glow"
+          className="ml-auto border border-white/[0.1] p-1 text-zinc-400 transition-all hover:border-[#d4ff00]/50 hover:text-[#d4ff00] shadow-none"
           title={collapsed ? 'Показать шкалу' : 'Свернуть шкалу'}
         >
           {collapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}

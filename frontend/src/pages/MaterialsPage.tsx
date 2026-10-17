@@ -224,7 +224,9 @@ export function MaterialsPage() {
                   >
                     <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.25em] text-[#d4ff00]">{material.subject}</div>
                     <div className="mb-2 font-display font-bold tracking-tight text-white">{material.topicName}</div>
-                    <p className="line-clamp-3 text-sm font-light text-zinc-500">{material.summaryTheory}</p>
+                    <div className="line-clamp-3 text-sm font-light text-zinc-500">
+                      <LatexText content={material.summaryTheory} />
+                    </div>
                   </button>
                 ))}
               </div>

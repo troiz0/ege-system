@@ -107,7 +107,7 @@ export function CustomSelect({
             ref={menuRef}
             role="listbox"
             style={{ top: pos.top, left: pos.left, width: pos.width }}
-            className="fixed left-0 right-0 top-full z-50 mt-1.5 max-h-60 overflow-y-auto rounded-none border border-white/10 bg-[#0d0d12] shadow-2xl"
+            className="fixed left-0 right-0 top-full z-50 mt-1.5 max-h-60 overflow-y-auto rounded-none border border-zinc-800 bg-[#0d0d12] shadow-none"
           >
             {options.map((opt) => {
               const active = opt.value === value;

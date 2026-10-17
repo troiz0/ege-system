@@ -54,3 +54,4 @@ Thumbs.db
 *.sw?
 tests_swarm/
 .browser_profile/
+.chrome_test_profile/

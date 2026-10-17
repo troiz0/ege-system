@@ -24,61 +24,64 @@ export function isSubjectMatchingTarget(subject: string, targetNames: string[]):
     if (s === t) return true;
 
     // Математика (профиль / база) покрывает школьные разделы: алгебра, геометрия, матанализ, вероятность и статистика
-    if (t.includes('математик')) {
+    if (t.includes('математик') || t.includes('math')) {
       if (
         s.includes('математик') ||
         s.includes('алгебр') ||
         s.includes('геометр') ||
         s.includes('вероятност') ||
         s.includes('статистик') ||
-        s.includes('тригонометр')
+        s.includes('тригонометр') ||
+        s.includes('math')
       ) {
         return true;
       }
     }
 
     // Информатика покрывает программирование и IT-дисциплины
-    if (t.includes('информатик')) {
+    if (t.includes('информатик') || t.includes('inf')) {
       if (
         s.includes('информатик') ||
         s.includes('программирован') ||
         s.includes('алгоритм') ||
-        s.includes('код')
+        s.includes('код') ||
+        s.includes('inf') ||
+        s.includes('cs')
       ) {
         return true;
       }
     }
 
     // Русский язык
-    if (t.includes('русск') && s.includes('русск')) return true;
+    if ((t.includes('русск') || t.includes('rus')) && (s.includes('русск') || s.includes('rus'))) return true;
 
     // Физика
-    if (t.includes('физик') && s.includes('физик')) return true;
+    if ((t.includes('физик') || t.includes('phys')) && (s.includes('физик') || s.includes('phys'))) return true;
 
     // Химия
-    if (t.includes('хими') && s.includes('хими')) return true;
+    if ((t.includes('хими') || t.includes('chem')) && (s.includes('хими') || s.includes('chem'))) return true;
 
     // Биология
-    if (t.includes('биолог') && s.includes('биолог')) return true;
+    if ((t.includes('биолог') || t.includes('bio')) && (s.includes('биолог') || s.includes('bio'))) return true;
 
     // История
-    if (t.includes('истори') && s.includes('истори')) return true;
+    if ((t.includes('истори') || t.includes('hist')) && (s.includes('истори') || s.includes('hist'))) return true;
 
     // Обществознание
-    if (t.includes('обществ') && s.includes('обществ')) return true;
+    if ((t.includes('обществ') || t.includes('soc')) && (s.includes('обществ') || s.includes('soc'))) return true;
 
     // География
-    if (t.includes('географ') && s.includes('географ')) return true;
+    if ((t.includes('географ') || t.includes('geo')) && (s.includes('географ') || s.includes('geo'))) return true;
 
     // Литература
-    if (t.includes('литератур') && s.includes('литератур')) return true;
+    if ((t.includes('литератур') || t.includes('lit')) && (s.includes('литератур') || s.includes('lit'))) return true;
 
     // Иностранные языки
-    if (t.includes('английск') && (s.includes('английск') || s.includes('иностранный (английский)'))) return true;
-    if (t.includes('немецк') && s.includes('немецк')) return true;
-    if (t.includes('французск') && s.includes('французск')) return true;
-    if (t.includes('испанск') && s.includes('испанск')) return true;
-    if (t.includes('китайск') && s.includes('китайск')) return true;
+    if ((t.includes('английск') || t.includes('eng')) && (s.includes('английск') || s.includes('eng') || s.includes('иностранный'))) return true;
+    if (t.includes('немецк') && (s.includes('немецк') || s.includes('deu'))) return true;
+    if (t.includes('французск') && (s.includes('французск') || s.includes('fra'))) return true;
+    if (t.includes('испанск') && (s.includes('испанск') || s.includes('spa'))) return true;
+    if (t.includes('китайск') && (s.includes('китайск') || s.includes('chi'))) return true;
 
     return false;
   });

@@ -221,7 +221,7 @@ export const AppealCalculatorPage: React.FC = () => {
               onClick={() => handleTaskSelect(t.number)}
               className={`px-2.5 py-1 font-mono text-xs uppercase border transition-all rounded-none ${
                 taskNumber === t.number
-                  ? 'border-[#d4ff00] bg-[#d4ff00]/10 text-[#d4ff00] font-bold ring-1 ring-[#d4ff00]'
+                  ? 'border-[#d4ff00] bg-[#d4ff00]/10 text-[#d4ff00] font-bold shadow-none'
                   : 'border-white/10 text-zinc-400 hover:border-white/20 hover:text-white'
               }`}
             >
@@ -327,7 +327,7 @@ export const AppealCalculatorPage: React.FC = () => {
           <button
             type="submit"
             disabled={analyzing}
-            className="btn-lime w-full sm:w-auto !py-2.5 !px-6 text-xs md:text-sm font-bold uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-50 rounded-none shadow-[0_0_20px_rgba(212,255,0,0.25)]"
+            className="btn-lime w-full sm:w-auto !py-2.5 !px-6 text-xs md:text-sm font-bold uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-50 rounded-none shadow-none"
           >
             {analyzing ? (
               <>

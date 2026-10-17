@@ -110,6 +110,27 @@ class ApiClient {
     });
   }
 
+  async requestRegisterCode(email: string, password: string, name: string, grade?: number) {
+    return this.request<{ success: boolean; message: string; devCode?: string }>('/api/auth/register/request-code', {
+      method: 'POST',
+      body: JSON.stringify({ email, password, name, grade }),
+    });
+  }
+
+  async verifyRegisterCode(email: string, code: string) {
+    return this.request<AuthResponse>('/api/auth/register/verify-code', {
+      method: 'POST',
+      body: JSON.stringify({ email, code }),
+    });
+  }
+
+  async resendRegisterCode(email: string) {
+    return this.request<{ success: boolean; message: string; devCode?: string }>('/api/auth/register/resend-code', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
   async login(email: string, password: string) {
     return this.request<AuthResponse>('/api/auth/login', {
       method: 'POST',
@@ -144,10 +165,17 @@ class ApiClient {
   async getProfile() {
     const data = await this.request<{
       profile: Partial<Profile>;
+      email?: string;
+      authProvider?: string;
       targetSubjects?: TargetSubject[];
       selectedAiModel?: string;
       role?: 'student' | 'tutor' | 'teacher';
       targetTrack?: 'BASE_65' | 'SOLID_85' | 'OLYMP_95';
+      googleId?: string | null;
+      telegramId?: string | null;
+      telegramUsername?: string | null;
+      isBanned?: boolean;
+      banReason?: string | null;
       xp?: number;
       level?: number;
       gamification?: GamificationTelemetry;
@@ -160,9 +188,19 @@ class ApiClient {
 
     // Синхронизируем глобальное состояние пользователя в authStore
     useAuthStore.getState().updateUserXp(xp, level);
+    if (typeof p.grade === 'number') {
+      useAuthStore.getState().updateUserGrade(p.grade);
+    }
 
     return {
       ...p,
+      email: data.email ?? (p as any).email ?? '',
+      authProvider: data.authProvider ?? (p as any).authProvider ?? 'LOCAL',
+      googleId: data.googleId ?? p.googleId ?? null,
+      telegramId: data.telegramId ?? p.telegramId ?? null,
+      telegramUsername: data.telegramUsername ?? p.telegramUsername ?? null,
+      isBanned: data.isBanned ?? p.isBanned ?? false,
+      banReason: data.banReason ?? p.banReason ?? null,
       xp,
       level,
       gamification: data.gamification,
@@ -207,7 +245,59 @@ class ApiClient {
     if (typeof res.xp === 'number' && typeof res.level === 'number') {
       useAuthStore.getState().updateUserXp(res.xp, res.level);
     }
+    if (res.profile && typeof res.profile.grade === 'number') {
+      useAuthStore.getState().updateUserGrade(res.profile.grade);
+    }
     return res;
+  }
+
+  async linkGoogle(credential: string) {
+    return this.request<{ success: boolean; user: any }>('/api/profile/link-google', {
+      method: 'POST',
+      body: JSON.stringify({ credential }),
+    });
+  }
+
+  async unlinkGoogle() {
+    return this.request<{ success: boolean; user: any }>('/api/profile/unlink-google', {
+      method: 'POST',
+    });
+  }
+
+  async deleteAccount() {
+    return this.request<{ success: boolean; message?: string }>('/api/profile/account', {
+      method: 'DELETE',
+    });
+  }
+
+  async requestEmailLinkCode(email: string) {
+    return this.request<{ success: boolean; message: string; cooldownSeconds?: number; devCode?: string }>(
+      '/api/profile/email/request-code',
+      {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      }
+    );
+  }
+
+  async verifyEmailLinkCode(email: string, code: string) {
+    return this.request<{ success: boolean; message: string; email: string; user?: any }>(
+      '/api/profile/email/verify-code',
+      {
+        method: 'POST',
+        body: JSON.stringify({ email, code }),
+      }
+    );
+  }
+
+  async resendEmailLinkCode(email: string) {
+    return this.request<{ success: boolean; message: string; cooldownSeconds?: number; devCode?: string }>(
+      '/api/profile/email/resend-code',
+      {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      }
+    );
   }
 
   // Settings / Конфигурация подготовки по МЭШ
@@ -719,6 +809,10 @@ class ApiClient {
       nextPlanSlot: d.nextPlanSlot ?? null,
       aiAdvice: d.tips ?? [],
       activityTimeline: (d as unknown as { activityTimeline?: Record<string, { count: number; details: string[] }> }).activityTimeline ?? {},
+      targetSubjectScores: (d as any).targetSubjectScores ?? [],
+      admissionTotalScore: (d as any).admissionTotalScore,
+      targetSubjectsTotal: (d as any).targetSubjectsTotal,
+      pureStudyTime: (d as any).pureStudyTime,
     };
     return summary;
   }
@@ -1105,9 +1199,13 @@ class ApiClient {
   // Telegram Notifications APIs
   async getTelegramStatus() {
     return this.request<{
+      linked: boolean;
       isLinked: boolean;
-      link: { id: string; role: string; token: string; isActive: boolean; createdAt: string } | null;
+      telegramId?: string | null;
+      telegramUsername?: string | null;
+      link: { id: string; role: string; token: string; isActive: boolean; chatId?: string | null; createdAt: string } | null;
       botUsername: string;
+      activeLinks: Array<{ id: string; role: string; chatId: string | null; token: string; createdAt: string }>;
     }>('/api/telegram/status');
   }
 
@@ -1115,6 +1213,7 @@ class ApiClient {
     return this.request<{
       token: string;
       botUsername: string;
+      linkUrl: string;
       instructions: string;
     }>('/api/telegram/token', {
       method: 'POST',
@@ -1123,16 +1222,56 @@ class ApiClient {
   }
 
   async simulateTelegramDigest() {
-    return this.request<{ success: boolean; message: string; digest: any }>('/api/telegram/simulate-digest', {
+    return this.request<{
+      success: boolean;
+      message: string;
+      sentTo?: string | null;
+      delivered?: boolean;
+      sendResult?: any;
+    }>('/api/telegram/simulate-digest', {
       method: 'POST',
     });
   }
 
   async simulateTelegramAlert(dropType = 'test_score_drop') {
-    return this.request<{ success: boolean; message: string; alert: any }>('/api/telegram/simulate-alert', {
+    return this.request<{
+      success: boolean;
+      message: string;
+      sentTo?: string | null;
+      delivered?: boolean;
+      sendResult?: any;
+    }>('/api/telegram/simulate-alert', {
       method: 'POST',
       body: JSON.stringify({ dropType }),
     });
+  }
+
+  async loginWithTelegram(telegramData: any) {
+    return this.request<{
+      token: string;
+      user: AuthUser;
+    }>('/api/auth/telegram', {
+      method: 'POST',
+      body: JSON.stringify(telegramData),
+    });
+  }
+
+  async createTelegramLoginSession() {
+    return this.request<{
+      token: string;
+      botUsername: string;
+      botUrl: string;
+    }>('/api/auth/telegram/session', {
+      method: 'POST',
+    });
+  }
+
+  async checkTelegramLoginSession(token: string) {
+    return this.request<{
+      approved: boolean;
+      token?: string;
+      user?: AuthUser;
+    }>(`/api/auth/telegram/check?token=${encodeURIComponent(token)}`);
   }
 
   // Reports & PDF Print APIs
@@ -1369,6 +1508,121 @@ class ApiClient {
     }>(`/api/pvp/match/${matchId}/answer`, {
       method: 'POST',
       body: JSON.stringify({ taskIndex, answer }),
+    });
+  }
+
+  // Admin Panel APIs
+  async getAdminMetrics() {
+    return this.request<{
+      totalUsers: number;
+      activeSessions: number;
+      dbSizeBytes: number;
+      dbSizeFormatted: string;
+      telegramLinkedCount: number;
+      mockExamsCount: number;
+      homeworksCount: number;
+      weakTopicsCount: number;
+      chatSessionsCount: number;
+      botUsername: string;
+      serverTime: string;
+      uptimeSeconds: number;
+    }>('/api/admin/metrics');
+  }
+
+  async getAdminUsers() {
+    return this.request<{
+      items: Array<{
+        id: string;
+        email: string;
+        name: string;
+        role: string;
+        grade: number;
+        track: string;
+        xp: number;
+        level: number;
+        streak: number;
+        subscriptionTier: string;
+        isDemo: boolean;
+        authProvider: string;
+        isBanned: boolean;
+        banReason: string | null;
+        bannedAt: string | null;
+        telegramLinked: boolean;
+        telegramChatId: string | null;
+        telegramUsername: string | null;
+        createdAt: string;
+        updatedAt: string;
+      }>;
+    }>('/api/admin/users');
+  }
+
+  async banUser(userId: string, reason: string) {
+    return this.request<{
+      success: boolean;
+      user: any;
+      telegramNotificationSent: boolean;
+    }>(`/api/admin/users/${userId}/ban`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  }
+
+  async unbanUser(userId: string) {
+    return this.request<{
+      success: boolean;
+      user: any;
+    }>(`/api/admin/users/${userId}/unban`, {
+      method: 'POST',
+    });
+  }
+
+  async broadcastTelegramMessage(data: { title: string; message: string; severity?: 'INFO' | 'WARNING' | 'CRITICAL' }) {
+    return this.request<{
+      success: boolean;
+      result: {
+        total: number;
+        sent: number;
+        details: Array<{ chatId: string; success: boolean; error?: string }>;
+      };
+    }>('/api/admin/broadcast', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getAdminOpenRouter() {
+    return this.request<{
+      configured: boolean;
+      liveStats: {
+        label?: string;
+        usage?: number;
+        limit?: number;
+        is_free_tier?: boolean;
+        rate_limit?: { requests: number; interval: string };
+      };
+      totalAiSnapshots: number;
+      usersWithKeys: number;
+      defaultModel: string;
+    }>('/api/admin/openrouter');
+  }
+
+  async runAdminMigration() {
+    return this.request<{
+      success: boolean;
+      stdout: string;
+      stderr: string | null;
+    }>('/api/admin/actions/migrate', {
+      method: 'POST',
+    });
+  }
+
+  async clearAdminCache() {
+    return this.request<{
+      success: boolean;
+      clearedCount: number;
+      message: string;
+    }>('/api/admin/actions/clear-cache', {
+      method: 'POST',
     });
   }
 }

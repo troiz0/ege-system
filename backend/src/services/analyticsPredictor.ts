@@ -3,9 +3,12 @@ import { isSubjectMatchingTarget } from '../lib/subjectMatcher.js';
 
 export interface TelemetryPredictorResult {
   predictor: {
-    minScore: number;
-    maxScore: number;
-    estimatedScore: number;
+    hasEnoughData: boolean;
+    minScore: number | null;
+    maxScore: number | null;
+    estimatedScore: number | null;
+    predictedScore: number | null;
+    scoreRange?: string | null;
     confidencePercent: number;
     trend: 'UP' | 'DOWN' | 'STABLE';
     meshAveragePercent: number;
@@ -81,35 +84,6 @@ export async function calculateTelemetryPredictor(userId: string): Promise<Telem
     ? mocks.filter((m) => isSubjectMatchingTarget(m.subject, targetNames))
     : mocks;
   const recentMockScores = targetMocks.slice(0, 3).map((m) => m.totalScore);
-  if (recentMockScores.length === 0) {
-    recentMockScores.push(68, 72, 76);
-  }
-
-  // Динамика/тренд
-  let trend: 'UP' | 'DOWN' | 'STABLE' = 'STABLE';
-  if (recentMockScores.length >= 2) {
-    const diff = recentMockScores[0] - recentMockScores[recentMockScores.length - 1];
-    if (diff >= 3) trend = 'UP';
-    else if (diff <= -3) trend = 'DOWN';
-  }
-
-  const latestMock = recentMockScores[0] || 75;
-  const mockAverage = recentMockScores.reduce((a, b) => a + b, 0) / recentMockScores.length;
-
-  // Предиктор итогового балла с доверительным интервалом
-  // По умолчанию оценка строится строго на пробниках и задачах КИМ (50% последний, 50% средний).
-  // Только если в настройках явно включена опция влияния МЭШ, подмешивается средний балл школы (вес 30%).
-  const paceBonus = trend === 'UP' ? Math.min(6, Math.round(weeksLeft * 0.35)) : trend === 'DOWN' ? -2 : 2;
-  const baseEstimated = useMeshInPredictor
-    ? Math.round(latestMock * 0.35 + mockAverage * 0.35 + meshAveragePercent * 0.3 + paceBonus)
-    : Math.round(latestMock * 0.5 + mockAverage * 0.5 + paceBonus);
-  const estimatedScore = Math.min(98, Math.max(45, baseEstimated));
-  
-  // Доверительный интервал
-  const spread = trend === 'UP' ? 3 : 4;
-  const minScore = Math.max(40, estimatedScore - spread);
-  const maxScore = Math.min(100, estimatedScore + spread);
-  const confidencePercent = relevantTests.length >= 5 && mocks.length >= 2 ? 88 : 76;
 
   // 4. Индикатор выгорания: если адаптация расписания включена — учитываем уроки МЭШ, иначе — только подготовка к ЕГЭ
   const relevantSchedule = useMeshSchedule ? scheduleItems : scheduleItems.filter((s) => s.source !== 'mesh');
@@ -140,11 +114,75 @@ export async function calculateTelemetryPredictor(userId: string): Promise<Telem
     recommendation = 'Нагрузка ниже целевой. Есть запас для добавления 1-2 блиц-тренажеров в расписание.';
   }
 
+  // Честный расчет достаточности данных: если у пользователя нет ни одного пробника и решено < 5 задач
+  const hasMocks = mocks.length > 0;
+  const solvedTasksCount = relevantTests.length;
+  const hasEnoughData = hasMocks || solvedTasksCount >= 5;
+
+  if (!hasEnoughData) {
+    return {
+      predictor: {
+        hasEnoughData: false,
+        minScore: null,
+        maxScore: null,
+        estimatedScore: null,
+        predictedScore: null,
+        scoreRange: null,
+        confidencePercent: 0,
+        trend: 'STABLE',
+        meshAveragePercent: relevantTests.length > 0 ? meshAveragePercent : 0,
+        recentMockScores: [],
+        weeksLeft,
+      },
+      burnout: {
+        status: burnoutStatus,
+        loadRatio,
+        weeklyLessonHours,
+        weeklyHomeworkHours,
+        targetWeeklyCapacityHours,
+        recommendation,
+      },
+    };
+  }
+
+  // Динамика/тренд (только по реальным пробникам)
+  let trend: 'UP' | 'DOWN' | 'STABLE' = 'STABLE';
+  if (recentMockScores.length >= 2) {
+    const diff = recentMockScores[0] - recentMockScores[recentMockScores.length - 1];
+    if (diff >= 3) trend = 'UP';
+    else if (diff <= -3) trend = 'DOWN';
+  }
+
+  const latestMock = recentMockScores.length > 0
+    ? recentMockScores[0]
+    : (relevantTests[0]?.normalizedPercent || meshAveragePercent);
+  const mockAverage = recentMockScores.length > 0
+    ? recentMockScores.reduce((a, b) => a + b, 0) / recentMockScores.length
+    : meshAveragePercent;
+
+  // Предиктор итогового балла с доверительным интервалом
+  // По умолчанию оценка строится строго на пробниках и задачах КИМ (50% последний, 50% средний).
+  // Только если в настройках явно включена опция влияния МЭШ, подмешивается средний балл школы (вес 30%).
+  const paceBonus = trend === 'UP' ? Math.min(6, Math.round(weeksLeft * 0.35)) : trend === 'DOWN' ? -2 : 2;
+  const baseEstimated = useMeshInPredictor
+    ? Math.round(latestMock * 0.35 + mockAverage * 0.35 + meshAveragePercent * 0.3 + paceBonus)
+    : Math.round(latestMock * 0.5 + mockAverage * 0.5 + paceBonus);
+  const estimatedScore = Math.min(98, Math.max(40, baseEstimated));
+  
+  // Доверительный интервал
+  const spread = trend === 'UP' ? 3 : 4;
+  const minScore = Math.max(40, estimatedScore - spread);
+  const maxScore = Math.min(100, estimatedScore + spread);
+  const confidencePercent = relevantTests.length >= 5 && mocks.length >= 2 ? 88 : 76;
+
   return {
     predictor: {
+      hasEnoughData: true,
       minScore,
       maxScore,
       estimatedScore,
+      predictedScore: estimatedScore,
+      scoreRange: `${minScore}–${maxScore}`,
       confidencePercent,
       trend,
       meshAveragePercent,

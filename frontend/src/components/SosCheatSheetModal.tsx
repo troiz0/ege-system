@@ -70,7 +70,7 @@ export const SosCheatSheetModal: React.FC<SosCheatSheetModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6 bg-black/80 backdrop-blur-sm">
-      <div className="relative w-full max-w-2xl rounded-none border border-white/10 bg-zinc-900 p-5 md:p-7 text-zinc-100 flex flex-col max-h-[92vh] overflow-y-auto shadow-2xl">
+      <div className="relative w-full max-w-2xl rounded-none border border-zinc-800 bg-zinc-900 p-5 md:p-7 text-zinc-100 flex flex-col max-h-[92vh] overflow-y-auto shadow-none">
         {/* HUD угол-бейдж */}
         <div className="flex items-center justify-between border-b border-white/[0.08] pb-3 mb-4">
           <div className="flex items-center gap-2">

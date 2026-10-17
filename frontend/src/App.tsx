@@ -1,6 +1,7 @@
 import { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ToastContainer } from './components/ToastContainer';
+import { HudConfirmModal } from './components/ui/HudConfirmModal';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AuthPage } from './pages/AuthPage';
 import { AuthMeshCallback } from './pages/AuthMeshCallback';
@@ -31,6 +32,7 @@ const ExamPressureSimulatorPage = lazy(() => import('./pages/ExamPressureSimulat
 const ExpertModePage = lazy(() => import('./pages/ExpertModePage'));
 const AppealCalculatorPage = lazy(() => import('./pages/AppealCalculatorPage'));
 const PvPArenaPage = lazy(() => import('./pages/PvPArenaPage'));
+const AdminPage = lazy(() => import('./pages/AdminPage'));
 
 function MainLayout() {
   const location = useLocation();
@@ -81,6 +83,7 @@ function MainLayout() {
               <Route path="/pvp" element={<PvPArenaPage />} />
               <Route path="/tutor" element={<TutorDashboardPage />} />
               <Route path="/mistakes" element={<MistakesPage />} />
+              <Route path="/admin" element={<AdminPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/terms" element={<TermsPage />} />
               <Route index element={<Navigate to="/dashboard" replace />} />
@@ -97,6 +100,7 @@ function App() {
   return (
     <BrowserRouter>
       <ToastContainer />
+      <HudConfirmModal />
       <Routes>
         {/* Главная — публичный иммерсивный протокол */}
         <Route

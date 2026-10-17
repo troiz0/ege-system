@@ -37,6 +37,7 @@ import settingsRoutes from './routes/settings.js';
 import sprintRoutes from './routes/sprint.js';
 import pvpRoutes from './routes/pvp.js';
 import matrixRoutes from './routes/matrix.js';
+import adminRoutes from './routes/admin.js';
 import { requireAuth } from './middleware/requireAuth.js';
 import { verifyToken } from './lib/auth.js';
 
@@ -82,10 +83,24 @@ app.use(cookieParser());
 // Rate limiting for auth routes
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 минут
-  max: 20, // 20 запросов за окно
+  max: 200, // 200 запросов за окно для общих действий
   message: { error: 'Слишком много запросов, попробуйте позже' },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => {
+    // Не ограничиваем Telegram deep-link поллинг, создание сессии, профиль и GET-запросы
+    if (
+      req.path.startsWith('/telegram') ||
+      req.path === '/me' ||
+      req.path === '/logout' ||
+      req.path === '/demo' ||
+      req.method === 'GET' ||
+      req.method === 'OPTIONS'
+    ) {
+      return true;
+    }
+    return false;
+  },
 });
 
 function getClientIdentifier(req: express.Request): string {
@@ -163,6 +178,7 @@ app.use('/api/telegram', telegramRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/config', settingsRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {
@@ -194,8 +210,24 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
   res.status(500).json({ error: 'Внутренняя ошибка сервера' });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`🚀 Сервер запущен на порту ${PORT}`);
   console.log(`📍 CLIENT_ORIGIN: ${CLIENT_ORIGIN}`);
   console.log(`🔒 NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
+});
+
+server.on('error', (err: any) => {
+  if (err.code === 'EADDRINUSE') {
+    console.warn(`⚠️ Порт ${PORT} занят. Завершение процесса для чистого перезапуска...`);
+    process.exit(1);
+  } else {
+    console.error('Ошибка сервера при прослушивании порта:', err);
+  }
+});
+
+process.on('SIGTERM', () => {
+  server.close(() => process.exit(0));
+});
+process.on('SIGINT', () => {
+  server.close(() => process.exit(0));
 });

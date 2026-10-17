@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { errText } from '../lib/errors';
 import { useToastStore } from '../store/toastStore';
+import { hudConfirm } from '../store/confirmStore';
 import { LatexText } from '../components/LatexText';
 import { InteractivePlotter } from '../components/InteractivePlotter';
-import { FileText, MessagesSquare, Paperclip, Pencil, Send, Sparkles, Trash2, X, Mic, MicOff, Volume2, VolumeX, Check } from 'lucide-react';
+import { FileText, MessagesSquare, Paperclip, Pencil, Send, Sparkles, Trash2, X, Mic, MicOff, Volume2, VolumeX, Check, Copy } from 'lucide-react';
 
 interface ChatSession {
   id: string;
@@ -33,41 +34,288 @@ interface ChatMsg {
 
 const MAX_FILES = 10;
 
-/** Парсит сообщение и рендерит интерактивные параметрические графики InteractivePlotter */
-function ChatMessageContent({ content }: { content: string }) {
-  const parts: Array<{ type: 'text' | 'plotter'; text: string }> = [];
-  const plotterRegex = /```plotter\s*([\s\S]*?)```/g;
+interface ParsedBlock {
+  type: 'plotter' | 'ascii' | 'code' | 'h1' | 'h2' | 'h3' | 'h4' | 'hr' | 'table' | 'text';
+  content?: string;
+  lang?: string;
+  headers?: string[];
+  rows?: string[][];
+}
+
+/** Авто-определение ASCII-чертежей и координатных схем */
+function isAsciiDiagramText(text: string): boolean {
+  const lines = text.split('\n').filter((l) => l.trim().length > 0);
+  if (lines.length < 3) return false;
+
+  let diagramScore = 0;
+  for (const line of lines) {
+    const hasAxis = /[\^|•]/.test(line);
+    const hasPlotChars = /[-+|=><\/\\~.]{2,}/.test(line) || /^\s*[0-9.\-+]+\s*[+|]/.test(line);
+    const hasDiag = /[/\\]\s*[/\\]|[/\\]\s*[|•]|[|•]\s*[/\\]/.test(line);
+    if ((hasAxis && hasPlotChars) || hasDiag || /[-—─]{3,}>|\^/.test(line)) {
+      diagramScore++;
+    }
+  }
+  return diagramScore >= 2 && diagramScore / lines.length >= 0.35;
+}
+
+/** Специализированный компонент отображения ASCII-схем и чертежей в стиле кибер-HUD */
+function AsciiDiagramView({ content }: { content: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard?.writeText(content).catch(() => undefined);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="my-3 overflow-hidden rounded border border-[#d4ff00]/30 bg-[#07080a] shadow-lg shadow-black/40">
+      {/* HUD-шапка схемы */}
+      <div className="flex items-center justify-between border-b border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[10px] font-mono text-zinc-400">
+        <div className="flex items-center gap-2">
+          <span className="inline-block h-2 w-2 rounded-full bg-[#d4ff00] animate-pulse" />
+          <span className="font-bold tracking-wider text-zinc-200">
+            [ ASCII_SCHEMATIC // ЧЕРТЕЖ_ГРАФИКА ]
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="flex items-center gap-1 text-zinc-400 hover:text-[#d4ff00] transition-colors"
+          title="Скопировать чертеж"
+        >
+          {copied ? (
+            <>
+              <Check className="h-3 w-3 text-[#d4ff00]" />
+              <span className="text-[#d4ff00]">СКОПИРОВАНО</span>
+            </>
+          ) : (
+            <>
+              <Copy className="h-3 w-3" />
+              <span>КОПИРОВАТЬ</span>
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Моноширинный чертеж с фиксированным шагом символов */}
+      <pre
+        className="overflow-x-auto p-3.5 font-mono text-xs leading-[1.18] text-[#d4ff00] select-all whitespace-pre"
+        style={{
+          fontFamily: "ui-monospace, 'JetBrains Mono', 'Cascadia Code', 'Fira Code', 'Courier New', monospace",
+          letterSpacing: '0px',
+        }}
+      >
+        <code>{content}</code>
+      </pre>
+    </div>
+  );
+}
+
+function parseMarkdownBlocks(text: string): ParsedBlock[] {
+  const blocks: ParsedBlock[] = [];
+  // 1. Отделяем блоки кода ``` ... ```
+  const codeRegex = /```(plotter|[a-zA-Z0-9_-]+)?\s*([\s\S]*?)```/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
-  while ((match = plotterRegex.exec(content)) !== null) {
+  while ((match = codeRegex.exec(text)) !== null) {
     if (match.index > lastIndex) {
-      parts.push({ type: 'text', text: content.slice(lastIndex, match.index) });
+      const textChunk = text.slice(lastIndex, match.index);
+      blocks.push(...parseTextChunks(textChunk));
     }
-    parts.push({ type: 'plotter', text: match[1].trim() });
-    lastIndex = plotterRegex.lastIndex;
+    const tag = (match[1] || '').trim().toLowerCase();
+    const body = match[2].trim();
+    if (tag === 'plotter') {
+      blocks.push({ type: 'plotter', content: body });
+    } else if (
+      tag === 'ascii' ||
+      tag === 'art' ||
+      tag === 'diagram' ||
+      tag === 'scheme' ||
+      isAsciiDiagramText(body)
+    ) {
+      blocks.push({ type: 'ascii', content: body });
+    } else {
+      blocks.push({ type: 'code', lang: tag, content: body });
+    }
+    lastIndex = codeRegex.lastIndex;
   }
-  if (lastIndex < content.length) {
-    parts.push({ type: 'text', text: content.slice(lastIndex) });
+  if (lastIndex < text.length) {
+    blocks.push(...parseTextChunks(text.slice(lastIndex)));
+  }
+  return blocks;
+}
+
+function parseTextChunks(chunk: string): ParsedBlock[] {
+  const lines = chunk.split('\n');
+  const result: ParsedBlock[] = [];
+  let tableBuffer: string[] = [];
+  let textBuffer: string[] = [];
+
+  const flushText = () => {
+    if (textBuffer.length > 0) {
+      const text = textBuffer.join('\n').trim();
+      if (text) {
+        if (isAsciiDiagramText(text)) {
+          result.push({ type: 'ascii', content: text });
+        } else {
+          result.push({ type: 'text', content: text });
+        }
+      }
+      textBuffer = [];
+    }
+  };
+
+  const flushTable = () => {
+    if (tableBuffer.length >= 2) {
+      const parseRow = (line: string) =>
+        line
+          .replace(/^\||\|$/g, '')
+          .split('|')
+          .map((c) => c.trim());
+
+      const headers = parseRow(tableBuffer[0]);
+      const rows: string[][] = [];
+      for (let i = 2; i < tableBuffer.length; i++) {
+        if (tableBuffer[i].includes('|')) {
+          rows.push(parseRow(tableBuffer[i]));
+        }
+      }
+      result.push({ type: 'table', headers, rows });
+    } else if (tableBuffer.length > 0) {
+      textBuffer.push(...tableBuffer);
+    }
+    tableBuffer = [];
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Таблицы Markdown (| col1 | col2 |)
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      flushText();
+      tableBuffer.push(trimmed);
+      continue;
+    } else if (tableBuffer.length > 0) {
+      flushTable();
+    }
+
+    // Горизонтальный разделитель (--- или ***)
+    if (/^(\-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
+      flushText();
+      result.push({ type: 'hr' });
+      continue;
+    }
+
+    // Заголовки Markdown (# , ## , ### , #### )
+    const hMatch = trimmed.match(/^(#{1,4})\s+(.+)$/);
+    if (hMatch) {
+      flushText();
+      const level = hMatch[1].length;
+      const title = hMatch[2].trim();
+      result.push({ type: `h${level}` as 'h1' | 'h2' | 'h3' | 'h4', content: title });
+      continue;
+    }
+
+    textBuffer.push(line);
   }
 
-  if (parts.length === 0 || (parts.length === 1 && parts[0].type === 'text')) {
-    return (
-      <div className="whitespace-pre-wrap">
-        <LatexText content={content} />
-      </div>
-    );
-  }
+  flushTable();
+  flushText();
+  return result;
+}
+
+/** Парсит сообщение и рендерит интерактивные графики, ASCII-схемы, блоки кода, таблицы и заголовки Markdown */
+function ChatMessageContent({ content }: { content: string }) {
+  const blocks = useMemo(() => parseMarkdownBlocks(content), [content]);
 
   return (
-    <div className="space-y-3">
-      {parts.map((p, idx) => {
-        if (p.type === 'plotter') {
-          return <InteractivePlotter key={idx} config={p.text} />;
+    <div className="space-y-2.5">
+      {blocks.map((b, idx) => {
+        if (b.type === 'plotter') {
+          return <InteractivePlotter key={idx} config={b.content || ''} />;
+        }
+        if (b.type === 'ascii') {
+          return <AsciiDiagramView key={idx} content={b.content || ''} />;
+        }
+        if (b.type === 'code') {
+          return (
+            <pre
+              key={idx}
+              className="my-2.5 overflow-x-auto rounded border border-white/10 bg-black/60 p-3 font-mono text-xs leading-relaxed text-zinc-300"
+            >
+              <code>{b.content}</code>
+            </pre>
+          );
+        }
+        if (b.type === 'h1') {
+          return (
+            <h1 key={idx} className="mt-4 mb-2 border-b border-white/10 pb-1 text-base font-bold text-zinc-100">
+              <LatexText content={b.content} />
+            </h1>
+          );
+        }
+        if (b.type === 'h2') {
+          return (
+            <h2 key={idx} className="mt-3.5 mb-1.5 text-sm font-bold text-zinc-100">
+              <LatexText content={b.content} />
+            </h2>
+          );
+        }
+        if (b.type === 'h3') {
+          return (
+            <h3 key={idx} className="mt-3 mb-1 text-xs font-bold text-[#d4ff00]">
+              <LatexText content={b.content} />
+            </h3>
+          );
+        }
+        if (b.type === 'h4') {
+          return (
+            <h4 key={idx} className="mt-2.5 mb-0.5 font-mono text-[11px] font-bold uppercase tracking-wider text-zinc-300">
+              <LatexText content={b.content} />
+            </h4>
+          );
+        }
+        if (b.type === 'hr') {
+          return <hr key={idx} className="my-2.5 border-white/10" />;
+        }
+        if (b.type === 'table' && b.headers) {
+          return (
+            <div key={idx} className="my-3 overflow-x-auto">
+              <table className="w-full border-collapse border border-white/15 text-xs text-zinc-300">
+                <thead>
+                  <tr className="bg-white/[0.06]">
+                    {b.headers.map((h, hIdx) => (
+                      <th
+                        key={hIdx}
+                        className="border border-white/15 px-3 py-1.5 text-left font-mono font-medium text-zinc-100"
+                      >
+                        <LatexText content={h} />
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {b.rows?.map((row, rIdx) => (
+                    <tr key={rIdx} className="hover:bg-white/[0.02]">
+                      {row.map((cell, cIdx) => (
+                        <td key={cIdx} className="border border-white/10 px-3 py-1.5">
+                          <LatexText content={cell} />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
         }
         return (
-          <div key={idx} className="whitespace-pre-wrap">
-            <LatexText content={p.text} />
+          <div key={idx} className="whitespace-pre-wrap leading-relaxed">
+            <LatexText content={b.content} />
           </div>
         );
       })}
@@ -479,7 +727,14 @@ export function AIChat() {
   };
 
   const deleteSession = async (id: string) => {
-    if (!window.confirm('Удалить диалог и всю историю?')) return;
+    const ok = await hudConfirm({
+      title: 'УДАЛЕНИЕ ДИАЛОГА',
+      message: 'Удалить диалог и всю историю сообщений без возможности восстановления?',
+      confirmText: '[ УДАЛИТЬ ]',
+      cancelText: '[ ОТМЕНА ]',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.deleteChatSession(id);
       const rest = sessions.filter((s) => s.id !== id);
@@ -614,7 +869,7 @@ export function AIChat() {
 
       {/* Левая колонка — список диалогов: на мобильных шторка-оверлей */}
       <aside
-        className={`fixed left-0 top-14 z-50 flex h-[calc(100dvh-3.5rem)] w-72 shrink-0 flex-col border-r border-white/10 bg-[#09090b] p-4 shadow-2xl transition-transform md:static md:z-auto md:h-full md:w-64 lg:w-72 md:translate-x-0 overflow-hidden ${
+        className={`fixed left-0 top-14 z-50 flex h-[calc(100dvh-3.5rem)] w-72 shrink-0 flex-col border-r border-white/10 bg-[#09090b] p-4 shadow-none transition-transform md:static md:z-auto md:h-full md:w-64 lg:w-72 md:translate-x-0 overflow-hidden ${
           isMobileListOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -864,7 +1119,7 @@ export function AIChat() {
                 key={q}
                 onClick={() => void send(q)}
                 disabled={sending || loadingMessages}
-                className="mono-chip text-[11px] transition-all hover:border-[#d4ff00]/50 hover:text-zinc-100 hover:shadow-glow disabled:opacity-50"
+                className="mono-chip text-[11px] transition-all hover:border-[#d4ff00]/50 hover:text-zinc-100 shadow-none disabled:opacity-50"
               >
                 [ {q} ]
               </button>

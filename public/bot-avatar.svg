@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" fill="#09090b"/>
+  <defs>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M 32 0 L 0 0 0 32" fill="none" stroke="#ffffff" stroke-width="0.5" stroke-opacity="0.04"/>
+    </pattern>
+  </defs>
+  <rect width="512" height="512" fill="url(#grid)" />
+  
+  <!-- Outer border -->
+  <rect x="28" y="28" width="456" height="456" fill="none" stroke="#ffffff" stroke-width="1" stroke-opacity="0.12"/>
+  
+  <!-- Corner HUD brackets in #d4ff00 -->
+  <path d="M 28 64 L 28 28 L 64 28" fill="none" stroke="#d4ff00" stroke-width="4"/>
+  <path d="M 448 28 L 484 28 L 484 64" fill="none" stroke="#d4ff00" stroke-width="4"/>
+  <path d="M 28 448 L 28 484 L 64 484" fill="none" stroke="#d4ff00" stroke-width="4"/>
+  <path d="M 448 484 L 484 484 L 484 448" fill="none" stroke="#d4ff00" stroke-width="4"/>
+  
+  <!-- Reticle guides -->
+  <line x1="40" y1="256" x2="130" y2="256" stroke="#ffffff" stroke-width="1" stroke-dasharray="4 4" stroke-opacity="0.2"/>
+  <line x1="382" y1="256" x2="472" y2="256" stroke="#ffffff" stroke-width="1" stroke-dasharray="4 4" stroke-opacity="0.2"/>
+  <line x1="256" y1="40" x2="256" y2="120" stroke="#ffffff" stroke-width="1" stroke-dasharray="4 4" stroke-opacity="0.2"/>
+  <line x1="256" y1="390" x2="256" y2="472" stroke="#ffffff" stroke-width="1" stroke-dasharray="4 4" stroke-opacity="0.2"/>
+  
+  <!-- Cyberpunk 'E' Logo -->
+  <path d="M 160 140 H 352 V 196 H 224 V 228 H 316 V 284 H 224 V 316 H 352 V 372 H 160 Z" fill="#d4ff00"/>
+  <rect x="168" y="148" width="4" height="216" fill="#09090b" opacity="0.4"/>
+  
+  <!-- Telemetry HUD tags -->
+  <text x="40" y="474" font-family="monospace" font-size="10" fill="#d4ff00" letter-spacing="2">EGE.SYSTEM // BOT</text>
+  <text x="430" y="474" font-family="monospace" font-size="10" fill="#ffffff" fill-opacity="0.4" text-anchor="end">v2.0</text>
+</svg>

@@ -607,7 +607,7 @@ export const ExamPressureSimulatorPage: React.FC = () => {
     return (
       <div className="mx-auto max-w-6xl space-y-8">
         {!isOnline && (
-          <div className="bg-amber-500/10 border border-amber-500/50 text-amber-300 px-4 py-3 font-mono text-xs flex items-center justify-between rounded-none shadow-[0_0_20px_rgba(245,158,11,0.15)]">
+          <div className="bg-amber-500/10 border border-amber-500/50 text-amber-300 px-4 py-3 font-mono text-xs flex items-center justify-between rounded-none shadow-none">
             <div className="flex items-center gap-2.5">
               <span className="w-2.5 h-2.5 bg-amber-400 animate-ping" />
               <span className="font-bold tracking-wider">
@@ -1214,7 +1214,7 @@ export const ExamPressureSimulatorPage: React.FC = () => {
   return (
     <div className="w-full space-y-4 select-none">
       {!isOnline && (
-        <div className="bg-amber-500/10 border border-amber-500/50 text-amber-300 px-4 py-2 font-mono text-xs flex items-center justify-between rounded-none shadow-[0_0_20px_rgba(245,158,11,0.15)] animate-pulse">
+        <div className="bg-amber-500/10 border border-amber-500/50 text-amber-300 px-4 py-2 font-mono text-xs flex items-center justify-between rounded-none shadow-none animate-pulse">
           <div className="flex items-center gap-2.5">
             <span className="w-2.5 h-2.5 bg-amber-400 animate-ping" />
             <span className="font-bold tracking-wider">
@@ -1299,8 +1299,8 @@ export const ExamPressureSimulatorPage: React.FC = () => {
           onClick={() => setMobileTab('kim')}
           className={`flex-1 py-2 font-mono text-xs uppercase flex items-center justify-center gap-2 border transition-all ${
             mobileTab === 'kim'
-              ? 'border-[#d4ff00] bg-[#d4ff00]/10 text-white font-bold shadow-glow'
-              : 'border-white/[0.06] text-zinc-400 hover:border-[#d4ff00]/40 hover:shadow-glow'
+              ? 'border-[#d4ff00] bg-[#d4ff00]/10 text-white font-bold shadow-none'
+              : 'border-white/[0.06] text-zinc-400 hover:border-[#d4ff00]/40'
           }`}
         >
           <BookOpen className="w-3.5 h-3.5" />
@@ -1310,8 +1310,8 @@ export const ExamPressureSimulatorPage: React.FC = () => {
           onClick={() => setMobileTab('blank')}
           className={`flex-1 py-2 font-mono text-xs uppercase flex items-center justify-center gap-2 border transition-all ${
             mobileTab === 'blank'
-              ? 'border-[#d4ff00] bg-[#d4ff00]/10 text-white font-bold shadow-glow'
-              : 'border-white/[0.06] text-zinc-400 hover:border-[#d4ff00]/40 hover:shadow-glow'
+              ? 'border-[#d4ff00] bg-[#d4ff00]/10 text-white font-bold shadow-none'
+              : 'border-white/[0.06] text-zinc-400 hover:border-[#d4ff00]/40'
           }`}
         >
           <Edit3 className="w-3.5 h-3.5 text-[#d4ff00]" />

@@ -94,7 +94,7 @@ export function AuthMeshCallback() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#09090b] p-4">
-      <div className="w-full max-w-md rounded-none border border-white/[0.08] bg-white/[0.02] p-8 text-center shadow-card backdrop-blur-xl">
+      <div className="w-full max-w-md rounded-none border border-white/[0.08] bg-white/[0.02] p-8 text-center shadow-none backdrop-blur-xl">
         <div className="w-12 h-12 mx-auto mb-5 rounded-none bg-cyan-400/10 border border-cyan-400/20 flex items-center justify-center">
           <School className="w-6 h-6 text-cyan-400" />
         </div>

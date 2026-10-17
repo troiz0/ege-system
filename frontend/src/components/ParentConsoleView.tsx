@@ -81,18 +81,20 @@ export function ParentConsoleView({ data, onSwitchToStudent }: ParentConsoleView
   const [isExporting, setIsExporting] = useState(false);
   const { addToast } = useToastStore();
 
-  const currentMathScore = data.mockExamAverage.average || 76;
+  const targetSubjects = data.targetSubjectScores || [];
+  const hasMocks = (data.mockExamAverage?.count ?? 0) > 0;
+  const currentMathScore = hasMocks ? (data.mockExamAverage.average || 0) : 0;
   const targetMathScore = data.mockExamAverage.target || 85;
 
-  // Достоверный расчет прогнозной триады предметов на основе подтвержденного уровня подготовки:
-  // Без фиктивного умножения на потолочные 1.05 и 0.95
-  const currentTotal3 = Math.min(300, Math.round(currentMathScore * 3));
+  // Достоверный расчет баллов по ВСЕМ пробникам целевых предметов (любые предметы ученика)
+  const currentTotal3 = data.admissionTotalScore ?? (hasMocks ? Math.min(300, Math.round(currentMathScore * 3)) : 0);
 
   const selectedUni = UNIVERSITIES.find((u) => u.id === selectedUniId) || UNIVERSITIES[0];
   const deltaNeeded = selectedUni.passingScore - currentTotal3;
 
   // Реалистичный расчет вероятности зачисления на бюджет:
   const admissionProbability = (() => {
+    if (!hasMocks && currentTotal3 === 0) return 0;
     if (deltaNeeded <= -10) return 98;
     if (deltaNeeded <= 0) return 92;
     if (deltaNeeded <= 10) return 78;
@@ -101,7 +103,7 @@ export function ParentConsoleView({ data, onSwitchToStudent }: ParentConsoleView
     return Math.max(15, Math.round(35 - (deltaNeeded - 35) * 0.4));
   })();
 
-  const pureStudyFormatted = data.pureStudyTime?.formatted || `${Math.floor((data.mockExamAverage.count * 180) / 60)} ч`;
+  const pureStudyFormatted = data.pureStudyTime?.formatted || (hasMocks ? `${Math.floor((data.mockExamAverage.count * 180) / 60)} ч` : '0 ч 0 мин');
 
   const handleDownloadMonthlyPdf = async () => {
     try {
@@ -171,10 +173,14 @@ export function ParentConsoleView({ data, onSwitchToStudent }: ParentConsoleView
               СТАТУС ПОДГОТОВКИ
             </div>
             <div className="mt-1 font-sans text-xl font-semibold tracking-wide text-white">
-              {currentMathScore >= 80 ? 'ВЫСОКИЙ ШАНС' : currentMathScore >= 65 ? 'УВЕРЕННЫЙ' : 'ТРЕБУЕТ ВНИМАНИЯ'}
+              {hasMocks ? (currentMathScore >= 80 ? 'ВЫСОКИЙ ШАНС' : currentMathScore >= 65 ? 'УВЕРЕННЫЙ' : 'ТРЕБУЕТ ВНИМАНИЯ') : 'НЕТ ДАННЫХ'}
             </div>
             <p className="mt-1 font-sans text-xs text-zinc-400 font-light">
-              Текущий средний балл: <strong className="text-[#d4ff00] font-normal">{currentMathScore} из 100</strong> (Цель: {targetMathScore})
+              {hasMocks ? (
+                <>Текущий средний балл: <strong className="text-[#d4ff00] font-normal">{currentMathScore} из 100</strong> (Цель: {targetMathScore})</>
+              ) : (
+                <>Пробники еще не сдавались (Цель: {targetMathScore})</>
+              )}
             </p>
           </div>
 
@@ -203,6 +209,51 @@ export function ParentConsoleView({ data, onSwitchToStudent }: ParentConsoleView
           </div>
         </div>
       </div>
+
+      {/* ДЕКОМПОЗИЦИЯ БАЛЛОВ ПО ВСЕМ ЦЕЛЕВЫМ ПРЕДМЕТАМ (ПРОБНИКИ И ПРОГНОЗ) */}
+      {targetSubjects.length > 0 && (
+        <div className="rounded-none border border-white/10 bg-white/[0.02] p-5 backdrop-blur-xl">
+          <div className="mb-4 flex flex-wrap items-center justify-between border-b border-white/[0.06] pb-3 gap-2">
+            <div>
+              <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-[#d4ff00] block mb-0.5">
+                [ ВСЕ ЦЕЛЕВЫЕ ПРЕДМЕТЫ // ТЕЛЕМЕТРИЯ ПРОБНИКОВ ]
+              </span>
+              <h2 className="font-display text-base font-bold uppercase tracking-tight text-white">
+                Подтвержденные баллы по целевым предметам ({targetSubjects.length})
+              </h2>
+            </div>
+            <div className="font-mono text-xs text-zinc-400">
+              СУММА ВСЕХ ПРЕДМЕТОВ: <strong className="text-white font-normal">{data.targetSubjectsTotal || targetSubjects.reduce((s, t) => s + t.confirmedScore, 0)} Б.</strong>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {targetSubjects.map((subj) => (
+              <div key={subj.id} className="border border-white/10 bg-white/[0.015] p-3.5">
+                <div className="flex justify-between items-start">
+                  <span className="font-sans text-xs font-semibold text-zinc-200">{subj.subjectName}</span>
+                  <span className="font-mono text-xs font-bold text-[#d4ff00] border border-[#d4ff00]/40 bg-[#d4ff00]/10 px-1.5 py-0.5">
+                    {subj.confirmedScore} б.
+                  </span>
+                </div>
+                <div className="mt-2 font-mono text-[10px] text-zinc-400">
+                  {subj.mockCount > 0 ? (
+                    <span>Пробников: {subj.mockCount} (посл. {subj.latestScore} б. / ср. {subj.avgScore} б.)</span>
+                  ) : (
+                    <span>Пробник не сдавался (прогноз)</span>
+                  )}
+                </div>
+                <div className="mt-1 flex justify-between items-center text-[10px] font-mono text-zinc-500 border-t border-white/[0.04] pt-1.5">
+                  <span>Цель: {subj.targetScore} б.</span>
+                  <span className={subj.confirmedScore >= subj.targetScore ? 'text-emerald-400' : 'text-amber-400'}>
+                    {subj.confirmedScore >= subj.targetScore ? 'Выполнено' : `Дефицит: -${subj.targetScore - subj.confirmedScore} б.`}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* КАЛЬКУЛЯТОР ШАНСОВ НА БЮДЖЕТ (ПРЕДИКТОР ПОСТУПЛЕНИЯ) */}
       <div className="rounded-none border border-white/10 bg-white/[0.02] p-5 backdrop-blur-xl">
@@ -295,12 +346,14 @@ export function ParentConsoleView({ data, onSwitchToStudent }: ParentConsoleView
               {/* Дельта и вердикт */}
               <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="border border-white/10 bg-white/[0.02] p-3.5">
-                  <div className="font-mono text-[10px] text-zinc-500 uppercase tracking-[0.2em]">ТЕКУЩИЙ ПРОГНОЗ (3 ПРЕДМЕТА)</div>
+                  <div className="font-mono text-[10px] text-zinc-500 uppercase tracking-[0.2em]">СУММА ЦЕЛЕВЫХ ПРЕДМЕТОВ</div>
                   <div className="font-display text-lg font-semibold tracking-normal text-white mt-0.5">
                     {currentTotal3} баллов
                   </div>
                   <div className="font-sans text-xs text-zinc-400 mt-1 font-light">
-                    Подтверждено пробниками: {currentMathScore} б. (эквивалент триады: {currentTotal3}/300)
+                    {targetSubjects.length > 0 
+                      ? `Рассчитано по всем целевым предметам (${targetSubjects.length}): ${targetSubjects.map(s => `${s.subjectName}: ${s.confirmedScore} б.`).join(', ')}`
+                      : `Подтверждено пробниками: ${currentMathScore} б.`}
                   </div>
                 </div>
 
@@ -310,16 +363,42 @@ export function ParentConsoleView({ data, onSwitchToStudent }: ParentConsoleView
                     {deltaNeeded <= 0 ? 'ЗАПАС +' + Math.abs(deltaNeeded) + ' БАЛЛОВ' : 'НУЖНО ЕЩЕ +' + deltaNeeded + ' Б.'}
                   </div>
                   <div className="font-sans text-xs text-zinc-400 mt-1 font-light">
-                    {deltaNeeded <= 0 ? 'Гарантированное прохождение на бюджет' : `Для достижения цели достаточно прибавить +${Math.max(1, Math.ceil(deltaNeeded / 9))} первичных балла во 2-й части КИМ`}
+                    {deltaNeeded <= 0 
+                      ? 'Гарантированное прохождение на бюджетное отделение' 
+                      : `Для прохождения на бюджет требуется набрать еще +${deltaNeeded} вторичных баллов суммарно`}
                   </div>
                 </div>
               </div>
+
+              {/* Декомпозиция рекомендаций по целевым предметам */}
+              {targetSubjects.length > 0 && deltaNeeded > 0 && (
+                <div className="mt-4 border border-white/10 bg-white/[0.02] p-3.5">
+                  <div className="font-mono text-[10px] text-[#d4ff00] uppercase tracking-[0.2em] mb-2">
+                    РЕКОМЕНДАЦИИ ПО ДОБОРУ БАЛЛОВ ПО ЦЕЛЕВЫМ ПРЕДМЕТАМ:
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {targetSubjects.map((subj, idx) => {
+                      const share = Math.ceil(deltaNeeded / Math.max(1, targetSubjects.length));
+                      const neededForSubj = Math.min(100, subj.confirmedScore + share);
+                      const cleanName = subj.subjectName.replace(/\s*\(профиль\)|\s*\(базовая\)/gi, '');
+                      return (
+                        <div key={idx} className="flex justify-between items-center text-xs border border-white/[0.06] bg-black/40 px-2.5 py-1.5 font-sans">
+                          <span className="font-semibold text-zinc-200">{cleanName}:</span>
+                          <span className="font-mono text-zinc-400">
+                            текущий <strong className="text-white font-normal">{subj.confirmedScore}</strong> б. → цель <strong className="text-[#d4ff00] font-normal">{neededForSubj}</strong> б. (+{share})
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="mt-4 border-t border-white/[0.06] pt-3 flex items-center gap-2 text-xs font-sans text-zinc-400 font-light">
               <CheckCircle2 className="h-4 w-4 text-[#d4ff00] shrink-0" />
               <span>
-                Прогноз рассчитан по официальным приказам о зачислении прошлого года с учетом текущей динамики ученика.
+                Прогноз рассчитан по всем пробникам целевых предметов с учетом актуальных проходных баллов вузов.
               </span>
             </div>
           </div>

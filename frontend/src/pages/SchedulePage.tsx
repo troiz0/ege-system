@@ -4,6 +4,7 @@ import { LoadingPage } from '../components/ui/LoadingSpinner';
 import { EmptyState } from '../components/ui/EmptyState';
 import { CustomSelect } from '../components/ui/CustomSelect';
 import { useToastStore } from '../store/toastStore';
+import { hudConfirm } from '../store/confirmStore';
 import { Plus, Upload, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { ScheduleItem, ScheduleItemInput, MeshLesson } from '../lib/types';
 import { errText } from '../lib/errors';
@@ -196,7 +197,14 @@ export function SchedulePage() {
   };
 
   const deleteItem = async (id: string) => {
-    if (!confirm('Удалить урок?')) return;
+    const ok = await hudConfirm({
+      title: 'УДАЛЕНИЕ УРОКА',
+      message: 'Вы уверены, что хотите удалить этот урок из расписания?',
+      confirmText: '[ УДАЛИТЬ ]',
+      cancelText: '[ ОТМЕНА ]',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.deleteScheduleItem(id);
       addToast('success', 'Урок удалён');

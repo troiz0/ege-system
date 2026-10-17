@@ -144,7 +144,8 @@ export function preprocessLatex(content: string): string {
   if (!content) return '';
   const sanitized = sanitizeMathText(content);
   const normalized = normalizeVectors(sanitized);
-  const parts = normalized.split(/(\$\$[\s\S]*?\$\$|\$[^\$]+?\$)/g);
+  // Блочные формулы $$...$$ могут быть многострочными, инлайн-формулы $...$ строго однострочные без переходов строк
+  const parts = normalized.split(/(\$\$[\s\S]*?\$\$|\$(?:[^\$\n\r]|\\\$)+?\$)/g);
 
   return parts
     .map((part, index) => {
@@ -162,13 +163,15 @@ export const LatexText: React.FC<LatexTextProps> = ({ content, text, className =
 
   const preprocessed = useMemo(() => preprocessLatex(rawText), [rawText]);
 
-  // Разбиваем текст по математическим блокам $$...$$ и $...$
-  const parts = preprocessed.split(/(\$\$[\s\S]*?\$\$|\$[^\$]+?\$)/g);
+  // Разбиваем текст по математическим блокам $$...$$ (многострочные) и $...$ (однострочные)
+  const parts = preprocessed.split(/(\$\$[\s\S]*?\$\$|\$(?:[^\$\n\r]|\\\$)+?\$)/g);
+
+  let isBold = false;
 
   return (
     <span className={className}>
       {parts.map((part, index) => {
-        if (part.startsWith('$$') && part.endsWith('$$')) {
+        if (part.startsWith('$$') && part.endsWith('$$') && part.length >= 4) {
           // Блочная формула
           const math = part.slice(2, -2).trim().replace(/^\$+|\$+$/g, '');
           try {
@@ -177,6 +180,9 @@ export const LatexText: React.FC<LatexTextProps> = ({ content, text, className =
               throwOnError: false,
               errorColor: '#f87171',
             });
+            if (html.includes('class="katex-error"')) {
+              return <span key={index} className="font-mono text-xs text-zinc-300">{part}</span>;
+            }
             return (
               <span
                 key={index}
@@ -187,7 +193,7 @@ export const LatexText: React.FC<LatexTextProps> = ({ content, text, className =
           } catch {
             return <span key={index}>{part}</span>;
           }
-        } else if (part.startsWith('$') && part.endsWith('$')) {
+        } else if (part.startsWith('$') && part.endsWith('$') && part.length >= 2) {
           // Инлайн формула
           const math = part.slice(1, -1).trim().replace(/^\$+|\$+$/g, '');
           try {
@@ -196,10 +202,13 @@ export const LatexText: React.FC<LatexTextProps> = ({ content, text, className =
               throwOnError: false,
               errorColor: '#f87171',
             });
+            if (html.includes('class="katex-error"')) {
+              return <span key={index} className={isBold ? 'font-bold text-zinc-100' : 'text-zinc-300'}>{part}</span>;
+            }
             return (
               <span
                 key={index}
-                className="inline-block px-0.5"
+                className={`inline-block px-0.5 ${isBold ? 'font-bold text-zinc-100' : ''}`}
                 dangerouslySetInnerHTML={{ __html: html }}
               />
             );
@@ -207,7 +216,37 @@ export const LatexText: React.FC<LatexTextProps> = ({ content, text, className =
             return <span key={index}>{part}</span>;
           }
         }
-        return <span key={index}>{part}</span>;
+
+        // Обычный текст: парсинг markdown **жирный шрифт**
+        if (part.includes('**')) {
+          const subparts = part.split(/(\*\*)/g);
+          return (
+            <React.Fragment key={index}>
+              {subparts.map((sp, sIdx) => {
+                if (sp === '**') {
+                  isBold = !isBold;
+                  return null;
+                }
+                if (!sp) return null;
+                return isBold ? (
+                  <strong key={sIdx} className="font-bold text-zinc-100">
+                    {sp}
+                  </strong>
+                ) : (
+                  <span key={sIdx}>{sp}</span>
+                );
+              })}
+            </React.Fragment>
+          );
+        }
+
+        return isBold ? (
+          <strong key={index} className="font-bold text-zinc-100">
+            {part}
+          </strong>
+        ) : (
+          <span key={index}>{part}</span>
+        );
       })}
     </span>
   );

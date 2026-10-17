@@ -297,7 +297,7 @@ export const PvPArenaPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleStartSearch}
-                    className="btn-lime !py-3 !px-8 text-xs md:text-sm font-bold uppercase tracking-wider shadow-[0_0_20px_rgba(212,255,0,0.3)] hover:shadow-[0_0_30px_rgba(212,255,0,0.5)] transition-all rounded-none"
+                    className="btn-lime !py-3 !px-8 text-xs md:text-sm font-bold uppercase tracking-wider transition-all rounded-none shadow-none"
                   >
                     [ НАЙТИ СОПЕРНИКА // ПОИСК БОЯ ]
                   </button>
@@ -504,7 +504,7 @@ export const PvPArenaPage: React.FC = () => {
         <div
           className={`card-shelf p-6 md:p-8 border rounded-none space-y-6 ${
             isWinner
-              ? 'border-[#d4ff00] bg-[#d4ff00]/[0.08] shadow-[0_0_25px_rgba(212,255,0,0.2)]'
+              ? 'border-[#d4ff00] bg-[#d4ff00]/[0.08] shadow-none'
               : isDraw
               ? 'border-amber-500/60 bg-amber-950/20'
               : 'border-red-500/60 bg-red-950/20'

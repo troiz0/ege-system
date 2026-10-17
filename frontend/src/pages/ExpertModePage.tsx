@@ -210,7 +210,7 @@ export const ExpertModePage: React.FC = () => {
                 onClick={() => setSelectedLevel(cfg.level as 1 | 2 | 3)}
                 className={`p-3.5 text-left border rounded-none transition-all ${
                   isSelected
-                    ? `${cfg.color} border-current ring-1 ring-current font-bold bg-[#d4ff00]/[0.05]`
+                    ? `${cfg.color} border-current font-bold bg-[#d4ff00]/[0.05] shadow-none`
                     : 'border-white/10 bg-zinc-900/40 text-zinc-400 hover:border-white/20 hover:text-white'
                 }`}
               >
@@ -301,7 +301,7 @@ export const ExpertModePage: React.FC = () => {
                     }}
                     className={`p-4 border rounded-none cursor-pointer transition-all ${
                       isSelected
-                        ? 'border-[#d4ff00] bg-[#d4ff00]/[0.08] shadow-[0_0_15px_rgba(212,255,0,0.15)] ring-1 ring-[#d4ff00]'
+                        ? 'border-[#d4ff00] bg-[#d4ff00]/[0.08] shadow-none'
                         : 'border-white/[0.08] bg-zinc-950/70 hover:border-white/20'
                     }`}
                   >
@@ -420,27 +420,27 @@ export const ExpertModePage: React.FC = () => {
                   <span className="font-mono text-[10px] text-zinc-500 uppercase block mb-0.5">
                     ОФИЦИАЛЬНАЯ ВЫПИСКА КРИТЕРИЕВ:
                   </span>
-                  <p className="font-mono text-xs text-[#d4ff00]">
-                    {result.fipiOfficialVerdict.primaryCriteria}
-                  </p>
+                  <div className="font-mono text-xs text-[#d4ff00]">
+                    <LatexText content={result.fipiOfficialVerdict.primaryCriteria} />
+                  </div>
                 </div>
 
                 <div>
                   <span className="font-mono text-[10px] text-zinc-500 uppercase block mb-0.5">
                     ЭКСПЕРТНОЕ РЕЗЮМЕ ПРОВЕРКИ:
                   </span>
-                  <p className="bg-black/40 p-3 border border-white/[0.06] text-zinc-200 text-xs">
-                    {result.fipiOfficialVerdict.verdictText}
-                  </p>
+                  <div className="bg-black/40 p-3 border border-white/[0.06] text-zinc-200 text-xs">
+                    <LatexText content={result.fipiOfficialVerdict.verdictText} />
+                  </div>
                 </div>
 
                 <div>
                   <span className="font-mono text-[10px] text-zinc-500 uppercase block mb-0.5">
                     РЕКОМЕНДАЦИЯ ДЛЯ АПЕЛЛЯЦИИ / ОФОРМЛЕНИЯ:
                   </span>
-                  <p className="text-zinc-400 text-xs">
-                    {result.fipiOfficialVerdict.recommendation}
-                  </p>
+                  <div className="text-zinc-400 text-xs">
+                    <LatexText content={result.fipiOfficialVerdict.recommendation} />
+                  </div>
                 </div>
               </div>
 

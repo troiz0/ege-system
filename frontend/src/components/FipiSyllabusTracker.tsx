@@ -135,7 +135,7 @@ export const FipiSyllabusTracker: React.FC<FipiSyllabusTrackerProps> = ({
   return (
     <div className="space-y-6">
       {/* ПАНЕЛЬ ВЫБОРА ПРЕДМЕТА И СТАТИСТИКИ */}
-      <div className="bg-zinc-950/80 border border-white/[0.08] p-5 shadow-2xl">
+      <div className="bg-zinc-950/80 border border-white/[0.08] p-5 shadow-none">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/[0.08] pb-4">
           <div>
             <div className="flex items-center gap-2 mb-1.5">

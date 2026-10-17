@@ -105,9 +105,10 @@ export default {
         '18': '4.5rem',
       },
       boxShadow: {
-        'card': '0 1px 2px rgba(0,0,0,0.5), 0 16px 48px rgba(0,0,0,0.35)',
-        'glow': '0 0 24px rgba(212, 255, 0, 0.28)',
-        'rim': 'inset 0 1px 0 0 rgba(255,255,255,0.06)',
+        'card': 'none',
+        'glow': 'none',
+        'rim': 'none',
+        'none': 'none',
       },
       keyframes: {
         'alert-in': {

@@ -58,7 +58,7 @@ function Toast({ id, type, message, onClose }: ToastProps) {
 
   return (
     <Alert
-      className={`pointer-events-auto bg-card/95 shadow-card backdrop-blur-sm transition-[border-color] ${accents[type]} ${
+      className={`pointer-events-auto bg-card/95 shadow-none backdrop-blur-sm transition-[border-color] ${accents[type]} ${
         closing ? 'animate-alert-out' : 'animate-alert-in'
       }`}
     >

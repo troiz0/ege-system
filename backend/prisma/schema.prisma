@@ -13,8 +13,10 @@ model User {
   passwordHash       String?
   name               String
   avatarUrl          String?
-  authProvider       String   @default("LOCAL")   // LOCAL | GOOGLE | DEMO
+  authProvider       String   @default("LOCAL")   // LOCAL | GOOGLE | DEMO | TELEGRAM
   googleId           String?  @unique
+  telegramId         String?  @unique
+  telegramUsername   String?
   subscriptionTier   String   @default("FREE")    // FREE | PRO
   proExpiresAt       DateTime?
   openrouterKeyEnc   String?                      // персональный ключ, зашифрован AES-256-GCM
@@ -37,6 +39,9 @@ model User {
   meshWeakTopics         Boolean  @default(false)
   meshScorePredictor     Boolean  @default(false)
   meshScheduleAdaptation Boolean  @default(false)
+  isBanned           Boolean  @default(false)
+  banReason          String?
+  bannedAt           DateTime?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -421,5 +426,25 @@ model ClassMember {
 
   @@unique([classId, studentId])
   @@index([studentId])
+}
+
+model GamificationStreak {
+  userId         String  @id @map("user_id")
+  streakCount    Int     @default(1) @map("streak_count")
+  lastActionDate String? @map("last_action_date")
+  lastBonusDate  String? @map("last_bonus_date")
+
+  @@map("_gamification_streaks")
+}
+
+model VerificationCode {
+  id        String   @id @default(cuid())
+  email     String
+  code      String   // 6 цифр
+  payload   String   // JSON с захешированным паролем, именем и классом
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email, code])
 }
 

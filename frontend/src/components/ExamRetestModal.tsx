@@ -73,7 +73,7 @@ export const ExamRetestModal: React.FC<ExamRetestModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-6 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative flex max-h-[90vh] w-full max-w-3xl flex-col rounded-none border border-white/10 bg-zinc-900 shadow-2xl">
+      <div className="relative flex max-h-[90vh] w-full max-w-3xl flex-col rounded-none border border-zinc-800 bg-zinc-900 shadow-none">
         {/* ШАПКА */}
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-4 bg-zinc-900/60">
           <div className="flex items-center gap-2.5">

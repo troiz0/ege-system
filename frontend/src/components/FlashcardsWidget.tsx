@@ -129,7 +129,7 @@ export const FlashcardsWidget: React.FC = () => {
           <button
             onClick={handleGenerateMistakes}
             disabled={generating}
-            className="px-4 py-2 bg-[#d4ff00] text-black font-display font-bold text-xs uppercase tracking-wider transition-all hover:brightness-110 hover:shadow-glow flex items-center gap-2"
+            className="px-4 py-2 bg-[#d4ff00] text-black font-display font-bold text-xs uppercase tracking-wider transition-all hover:brightness-110 shadow-none flex items-center gap-2"
           >
             <Sparkles className="w-3.5 h-3.5" />
             Сгенерировать колоду из ошибок
@@ -179,7 +179,7 @@ export const FlashcardsWidget: React.FC = () => {
               <button
                 type="button"
                 onClick={handleShowAnswer}
-                className="w-full py-3 bg-[#d4ff00] hover:brightness-110 hover:shadow-glow text-black font-display text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2"
+                className="w-full py-3 bg-[#d4ff00] hover:brightness-110 shadow-none text-black font-display text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2"
               >
                 <Eye className="w-4 h-4" />
                 [ ПОКАЗАТЬ ОТВЕТ ]

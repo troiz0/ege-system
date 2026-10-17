@@ -228,7 +228,7 @@ export function MistakesPage() {
                     <div className="border border-emerald-500/20 bg-emerald-500/[0.04] p-3">
                       <span className="text-zinc-500 block uppercase text-[10px]">Правильный ответ:</span>
                       <span className="text-emerald-400 font-bold text-sm mt-0.5 block">
-                        {item.correctAnswer}
+                        <LatexText content={item.correctAnswer || ''} />
                       </span>
                     </div>
                   ) : (
@@ -252,7 +252,7 @@ export function MistakesPage() {
                     {!isRematchActive ? (
                       <button
                         onClick={() => handleStartRematch(item)}
-                        className="rounded-none border border-[#d4ff00] bg-[#d4ff00] px-4 py-2 font-display text-xs font-bold uppercase tracking-wider text-black transition-all hover:brightness-110 hover:shadow-glow"
+                        className="rounded-none border border-[#d4ff00] bg-[#d4ff00] px-4 py-2 font-display text-xs font-bold uppercase tracking-wider text-black transition-all hover:brightness-110 shadow-none"
                       >
                         <span className="flex items-center gap-1.5">
                           <Zap className="h-3.5 w-3.5 text-black" />
@@ -272,7 +272,7 @@ export function MistakesPage() {
                         <button
                           onClick={() => handleRematchSubmit(item.id)}
                           disabled={checkingAnswer}
-                          className="border border-[#d4ff00] bg-[#d4ff00] px-4 py-2 font-display text-xs font-bold uppercase text-black hover:brightness-110 hover:shadow-glow transition-all"
+                          className="border border-[#d4ff00] bg-[#d4ff00] px-4 py-2 font-display text-xs font-bold uppercase text-black hover:brightness-110 shadow-none transition-all"
                         >
                           {checkingAnswer ? 'ПРОВЕРКА...' : 'ПОДТВЕРДИТЬ ОТВЕТ'}
                         </button>

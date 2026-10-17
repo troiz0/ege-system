@@ -8,7 +8,9 @@ import { sanitizeMathText } from '../lib/mathSanitizer.js';
 function renderRichText(content: string): string {
   if (!content) return '';
   const sanitized = sanitizeMathText(content);
-  const parts = sanitized.split(/(\$\$[\s\S]*?\$\$|\$[^$]+?\$)/g);
+  // Авто-оборачивание любых незакавыченных LaTeX команд (\frac, \sqrt, \vec, \alpha, \text и т.д.)
+  const autoWrapped = sanitized.replace(/(?<!\$)\\([a-zA-Z]+(?:\s*\{[^{}]*\}|\s*\[[^\[\]]*\]|[0-9a-zA-Z_])*)(?!\$)/g, '$$$1$');
+  const parts = autoWrapped.split(/(\$\$[\s\S]*?\$\$|\$(?:[^\$\n\r]|\\\$)+?\$)/g);
   return parts
     .map((part) => {
       const isBlock = part.startsWith('$$') && part.endsWith('$$') && part.length >= 4;
@@ -172,8 +174,8 @@ export class PdfExportService {
     const mocks = targetNames.length > 0
       ? user.mockExams.filter((m) => isSubjectMatchingTarget(m.subject, targetNames))
       : user.mockExams;
-    const latestScore = mocks[0]?.totalScore ?? 68;
-    const avgScore = mocks.length > 0 ? Math.round(mocks.reduce((s, m) => s + m.totalScore, 0) / mocks.length) : 65;
+    const latestScore = mocks[0]?.totalScore ?? null;
+    const avgScore = mocks.length > 0 ? Math.round(mocks.reduce((s, m) => s + m.totalScore, 0) / mocks.length) : null;
     const relevantWeak = targetNames.length > 0
       ? user.weakTopics.filter((w) => isSubjectMatchingTarget(w.subject, targetNames))
       : user.weakTopics;
@@ -214,19 +216,19 @@ export class PdfExportService {
         <div class="header">
           <div style="font-size: 10px; text-transform: uppercase; color: #666; letter-spacing: 1.5px;">EGE.SYSTEM // MONTH-OVER-MONTH PEDAGOGICAL AUDIT</div>
           <h1 style="margin: 4px 0; font-size: 22px;">ЕЖЕМЕСЯЧНЫЙ ОТЧЕТ О ПОДГОТОВКЕ К ЕГЭ</h1>
-          <div style="font-size: 13px; color: #444;">Ученик: <b>${user.name}</b> (${profile?.grade ?? 11} класс) • Дата среза: <b>${new Date().toLocaleDateString('ru-RU')}</b></div>
+          <div style="font-size: 13px; color: #444;">Ученик: <b>${user.name}</b> (${profile?.grade ? `${profile.grade} класс` : 'класс не указан'}) • Дата среза: <b>${new Date().toLocaleDateString('ru-RU')}</b></div>
         </div>
 
         <div style="margin-bottom: 24px;">
           <div class="stat-box">
             <div style="font-size: 11px; color: #666;">ТЕКУЩИЙ СРЕЗ</div>
-            <div style="font-size: 24px; font-weight: bold; color: #000;">${latestScore} / 100</div>
-            <div style="font-size: 10px; color: #888;">Средний: ${avgScore} б.</div>
+            <div style="font-size: 24px; font-weight: bold; color: #000;">${latestScore !== null ? `${latestScore} / 100` : '—'}</div>
+            <div style="font-size: 10px; color: #888;">${avgScore !== null ? `Средний: ${avgScore} б.` : 'Пробники не сдавались'}</div>
           </div>
           <div class="stat-box">
             <div style="font-size: 11px; color: #666;">ЦЕЛЕВОЙ БАЛЛ</div>
             <div style="font-size: 24px; font-weight: bold; color: #222;">${target?.targetScore ?? 85} б.</div>
-            <div style="font-size: 10px; color: #888;">Дефицит: ${Math.max(0, (target?.targetScore ?? 85) - latestScore)} б.</div>
+            <div style="font-size: 10px; color: #888;">${latestScore !== null ? `Дефицит: ${Math.max(0, (target?.targetScore ?? 85) - latestScore)} б.` : 'Дефицит: —'}</div>
           </div>
           <div class="stat-box" style="margin-right: 0;">
             <div style="font-size: 11px; color: #666;">ДИСЦИПЛИНА ДЗ</div>

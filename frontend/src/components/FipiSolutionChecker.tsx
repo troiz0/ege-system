@@ -333,7 +333,7 @@ export const FipiSolutionChecker: React.FC<FipiSolutionCheckerProps> = ({
           <button
             onClick={handleCheck}
             disabled={checking || (!solutionText.trim() && attachedFiles.length === 0)}
-            className="w-full py-3 bg-[#d4ff00] text-black font-display font-extrabold uppercase text-xs tracking-wider transition-all hover:brightness-110 hover:shadow-glow disabled:opacity-40 disabled:hover:shadow-none flex items-center justify-center gap-2"
+            className="w-full py-3 bg-[#d4ff00] text-black font-display font-extrabold uppercase text-xs tracking-wider transition-all hover:brightness-110 shadow-none disabled:opacity-40 flex items-center justify-center gap-2"
           >
             {checking ? (
               <>

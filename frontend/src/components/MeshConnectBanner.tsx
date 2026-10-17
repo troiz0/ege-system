@@ -37,7 +37,7 @@ export function MeshConnectBanner() {
   return (
     <>
       {!dismissed && !connected && (
-        <div className="card-shelf mb-6 flex flex-col gap-4 p-5 shadow-card animate-fade-up sm:flex-row sm:items-center">
+        <div className="card-shelf mb-6 flex flex-col gap-4 p-5 shadow-none animate-fade-up sm:flex-row sm:items-center">
           <div className="flex items-start gap-3.5 flex-1 min-w-0">
             <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-none border border-[#d4ff00]/25 bg-[#d4ff00]/10">
               <School className="h-5 w-5 text-[#d4ff00]" />

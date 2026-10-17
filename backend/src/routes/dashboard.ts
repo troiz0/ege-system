@@ -74,6 +74,28 @@ router.get('/', requireAuth, async (req, res) => {
     
     const targetSubjectNames = targetSubjects.map((t) => t.subjectName);
 
+    // Детальный расчет баллов по ВСЕМ пробникам целевых предметов (любые предметы ученика)
+    const targetSubjectScores = targetSubjects.map((ts) => {
+      const subjectMocks = mockExams.filter((m) => isSubjectMatchingTarget(m.subject, [ts.subjectName]));
+      const mockCount = subjectMocks.length;
+      const latestScore = mockCount > 0 ? subjectMocks[0].totalScore : null;
+      const avgScore = mockCount > 0 ? Math.round(subjectMocks.reduce((s, m) => s + m.totalScore, 0) / mockCount) : null;
+      const bestScore = mockCount > 0 ? Math.max(...subjectMocks.map((m) => m.totalScore)) : null;
+      const confirmedScore = latestScore ?? ts.currentEstimatedScore ?? 0;
+
+      return {
+        id: ts.id,
+        subjectName: ts.subjectName,
+        targetScore: ts.targetScore,
+        currentEstimatedScore: ts.currentEstimatedScore,
+        mockCount,
+        latestScore,
+        avgScore,
+        bestScore,
+        confirmedScore,
+      };
+    });
+
     if (mockExams.length > 0 && targetSubjects.length > 0) {
       // Group by subject and get latest (только по целевым предметам)
       const targetMocks = mockExams.filter((m) => isSubjectMatchingTarget(m.subject, targetSubjectNames));
@@ -94,6 +116,16 @@ router.get('/', requireAuth, async (req, res) => {
         );
       }
     }
+
+    const sortedScores = [...targetSubjectScores].sort((a, b) => b.confirmedScore - a.confirmedScore);
+    const admissionTriad = sortedScores.slice(0, 3);
+    const admissionTotalScore = admissionTriad.length >= 3
+      ? admissionTriad.reduce((sum, item) => sum + item.confirmedScore, 0)
+      : admissionTriad.length > 0
+      ? Math.round(admissionTriad.reduce((sum, item) => sum + item.confirmedScore, 0) * (3 / admissionTriad.length))
+      : (avgMockScore ? avgMockScore * 3 : 0);
+
+    const targetSubjectsTotal = targetSubjectScores.reduce((sum, item) => sum + item.confirmedScore, 0);
 
     const dbUser = await prisma.user.findUnique({
       where: { id: user.id },
@@ -141,8 +173,8 @@ router.get('/', requireAuth, async (req, res) => {
     ]);
 
     const pureStudySeconds =
-      allMocks.reduce((sum, m) => sum + (m.timeSpentSeconds || 1800), 0) +
-      allSims.reduce((sum, s) => sum + (s.timeSpentSeconds || 1800), 0);
+      allMocks.reduce((sum, m) => sum + (m.timeSpentSeconds || 0), 0) +
+      allSims.reduce((sum, s) => sum + (s.timeSpentSeconds || 0), 0);
     const pureStudyHours = Math.round((pureStudySeconds / 3600) * 10) / 10;
 
     // Next study plan slot (строго по целевым предметам)
@@ -286,6 +318,9 @@ router.get('/', requireAuth, async (req, res) => {
         hours: pureStudyHours,
         formatted: `${Math.floor(pureStudySeconds / 3600)} ч ${Math.floor((pureStudySeconds % 3600) / 60)} мин`,
       },
+      targetSubjectScores,
+      admissionTotalScore: Math.min(300, admissionTotalScore),
+      targetSubjectsTotal,
     });
   } catch (error) {
     console.error('Get dashboard error:', error);

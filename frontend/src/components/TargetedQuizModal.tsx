@@ -172,7 +172,7 @@ export const TargetedQuizModal: React.FC<TargetedQuizModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-      <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-y-auto rounded-none border border-white/10 bg-zinc-900 p-6 text-zinc-100 shadow-2xl md:p-8">
+      <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-y-auto rounded-none border border-zinc-800 bg-zinc-900 p-6 text-zinc-100 shadow-none md:p-8">
         {/* HUD угол-скобки */}
         <div className="absolute top-2 left-2 font-mono text-[10px] text-[#d4ff00]/60 select-none">
           [ TARGETED_QUIZ // ENGINE_v2 ]

@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 import { LoadingPage } from '../components/ui/LoadingSpinner';
 import { EmptyState } from '../components/ui/EmptyState';
 import { useToastStore } from '../store/toastStore';
+import { hudConfirm } from '../store/confirmStore';
 import { CalendarDays, Sparkles, CheckCircle2, Circle, Clock, Play } from 'lucide-react';
 import { errText } from '../lib/errors';
 import type { PlanItem, PlanProgress } from '../lib/types';
@@ -61,7 +62,16 @@ export function EgePlanPage() {
   };
 
   const generate = async () => {
-    if (items.length > 0 && !window.confirm('Текущий план будет заменён новым. Продолжить?')) return;
+    if (items.length > 0) {
+      const ok = await hudConfirm({
+        title: 'ГЕНЕРАЦИЯ НОВОГО ПЛАНА',
+        message: 'Текущий план будет заменён новым. Продолжить?',
+        confirmText: '[ СГЕНЕРИРОВАТЬ ]',
+        cancelText: '[ ОТМЕНА ]',
+        variant: 'warning',
+      });
+      if (!ok) return;
+    }
     setGenerating(true);
     try {
       const data = await api.generatePlan();

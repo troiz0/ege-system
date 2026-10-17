@@ -6,18 +6,25 @@ interface User {
   email: string;
   name: string;
   avatarUrl?: string | null;
+  googleId?: string | null;
+  telegramId?: string | null;
+  telegramUsername?: string | null;
   subscriptionTier: string;
   isDemo: boolean;
   xp?: number;
   level?: number;
   onboardingCompleted?: boolean;
+  role?: string;
+  grade?: number | null;
 }
 
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   setUser: (user: User | null) => void;
+  updateUser: (patch: Partial<User>) => void;
   updateUserXp: (xp: number, level: number) => void;
+  updateUserGrade: (grade: number) => void;
   logout: () => void;
 }
 
@@ -43,10 +50,22 @@ export const useAuthStore = create<AuthState>()(
       user: initialAuth.user,
       isAuthenticated: initialAuth.isAuthenticated,
       setUser: (user) => set({ user, isAuthenticated: !!user }),
-      updateUserXp: (xp, level) =>
+      updateUser: (patch) =>
         set((state) => ({
-          user: state.user ? { ...state.user, xp, level } : null,
+          user: state.user ? { ...state.user, ...patch } : null,
         })),
+      updateUserXp: (xp, level) =>
+        set((state) => {
+          if (!state.user) return state;
+          if (state.user.xp === xp && state.user.level === level) return state;
+          return { user: { ...state.user, xp, level } };
+        }),
+      updateUserGrade: (grade) =>
+        set((state) => {
+          if (!state.user) return state;
+          if (state.user.grade === grade) return state;
+          return { user: { ...state.user, grade } };
+        }),
       logout: () => {
         set({ user: null, isAuthenticated: false });
         // Clear session cookie by calling logout API

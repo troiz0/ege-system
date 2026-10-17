@@ -320,7 +320,7 @@ export const InteractivePlotter: React.FC<{ config: PlotterConfig | string }> = 
   }, [renderCanvas]);
 
   return (
-    <div className="my-3 border border-white/10 bg-black p-3 rounded-none text-zinc-100 font-sans shadow-lg">
+    <div className="my-3 border border-white/10 bg-black p-3 rounded-none text-zinc-100 font-sans shadow-none">
       {/* HUD-шапка графопостроителя */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.08] pb-2 text-xs font-mono">
         <div className="flex items-center gap-2">

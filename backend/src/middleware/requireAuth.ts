@@ -42,6 +42,16 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       return;
     }
 
+    if (dbUser.isBanned) {
+      res.status(403).json({
+        error: 'ACCOUNT_BANNED',
+        code: 'ACCOUNT_BANNED',
+        reason: dbUser.banReason || 'Нарушение правил платформы',
+        message: `Ваш аккаунт заблокирован. Причина: ${dbUser.banReason || 'Нарушение правил платформы'}`,
+      });
+      return;
+    }
+
     req.user = { ...payload, ...dbUser } as AuthUser;
     next();
   } catch (error) {

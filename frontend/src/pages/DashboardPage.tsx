@@ -17,7 +17,7 @@ import { ParentConsoleView } from '../components/ParentConsoleView';
 import { ZeroStateOnboardingWizard } from '../components/ZeroStateOnboardingWizard';
 
 const CARD =
-  'min-w-0 rounded-none border border-white/10 bg-white/[0.02] p-5 backdrop-blur-xl shadow-sm';
+  'min-w-0 rounded-none border border-white/10 bg-white/[0.02] p-5 backdrop-blur-xl shadow-none';
 const ROW =
   'min-w-0 rounded-none border border-white/[0.06] bg-white/[0.015] p-3.5';
 
@@ -292,7 +292,7 @@ export function DashboardPage() {
             <div className="min-w-0 flex-1">
               <div className="mb-1 text-xs font-light text-zinc-400">Средний балл</div>
               <div className="font-display text-3xl md:text-4xl font-semibold tracking-normal text-zinc-100">
-                {data.mockExamAverage.average}
+                {data.mockExamAverage.count > 0 ? data.mockExamAverage.average : '—'}
               </div>
             </div>
             <div className="shrink-0 font-display text-2xl text-zinc-600">/</div>
@@ -307,7 +307,7 @@ export function DashboardPage() {
             {(() => {
               const { average, target, count } = data.mockExamAverage;
               if (count <= 0) {
-                return <div className="text-xs font-light text-zinc-500">Нет пробников</div>;
+                return <div className="text-xs font-light text-zinc-500">Нет сданных пробников</div>;
               }
               if (target <= 0) {
                 return <div className="text-xs font-light text-zinc-500">Задайте цель в профиле</div>;

@@ -116,7 +116,7 @@ export function ZeroStateOnboardingWizard({ isOpen, onClose }: ZeroStateOnboardi
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md animate-fade-in">
-      <div className="relative w-full max-w-2xl border border-white/20 bg-[#09090b]/95 backdrop-blur-2xl p-6 md:p-8 shadow-2xl space-y-6">
+      <div className="relative w-full max-w-2xl border border-white/20 bg-[#09090b]/95 backdrop-blur-2xl p-6 md:p-8 shadow-none space-y-6">
         {/* Кнопка закрытия */}
         <button
           onClick={() => handleFinish(false)}
@@ -154,7 +154,7 @@ export function ZeroStateOnboardingWizard({ isOpen, onClose }: ZeroStateOnboardi
                   onClick={() => setSelectedTrack(t.id)}
                   className={`p-3.5 text-left border rounded-none transition-all flex flex-col justify-between ${
                     selectedTrack === t.id
-                      ? 'border-[#d4ff00] bg-[#d4ff00]/10 text-white shadow-[0_0_15px_rgba(212,255,0,0.1)]'
+                      ? 'border-[#d4ff00] bg-[#d4ff00]/10 text-white shadow-none'
                       : 'border-white/10 bg-white/[0.02] text-zinc-300 hover:border-white/20'
                   }`}
                 >
@@ -303,7 +303,7 @@ export function ZeroStateOnboardingWizard({ isOpen, onClose }: ZeroStateOnboardi
               </button>
               <button
                 onClick={() => handleFinish(true)}
-                className="w-full sm:w-auto btn-lime flex items-center justify-center gap-2 px-6 py-2.5 font-mono text-[11px] font-medium uppercase tracking-[0.2em] shadow-[0_0_20px_rgba(212,255,0,0.15)]"
+                className="w-full sm:w-auto btn-lime flex items-center justify-center gap-2 px-6 py-2.5 font-mono text-[11px] font-medium uppercase tracking-[0.2em]"
               >
                 <Zap className="h-4 w-4 fill-current" />
                 НАЧАТЬ ЭКСПРЕСС-ДИАГНОСТИКУ (15 МИН)
