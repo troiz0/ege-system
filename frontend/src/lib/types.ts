@@ -40,6 +40,8 @@ export interface TargetSubject {
 export interface Profile {
   id?: string;
   userId?: string;
+  name?: string;
+  avatarUrl?: string | null;
   email?: string;
   authProvider?: string;
   googleId?: string | null;

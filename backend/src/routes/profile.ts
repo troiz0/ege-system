@@ -1,5 +1,8 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { z } from 'zod';
+import multer from 'multer';
+import path from 'node:path';
+import fs from 'node:fs';
 import { requireAuth } from '../middleware/requireAuth';
 import { prisma } from '../lib/prisma';
 import { differenceInDays, differenceInWeeks } from 'date-fns';
@@ -18,6 +21,35 @@ const COOKIE_OPTIONS = {
   sameSite: 'lax' as const,
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
+
+// Конфигурация multer для загрузки аватаров пользователей
+const avatarStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    const dir = path.resolve('uploads/avatars');
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    cb(null, dir);
+  },
+  filename: (req: any, file, cb) => {
+    const rawExt = path.extname(file.originalname).toLowerCase();
+    const safeExt = ['.png', '.jpg', '.jpeg', '.webp', '.svg', '.gif'].includes(rawExt) ? rawExt : '.png';
+    const userId = req.user?.id ? req.user.id.slice(0, 8) : 'user';
+    cb(null, `avatar-${userId}-${Date.now()}${safeExt}`);
+  },
+});
+
+const uploadAvatar = multer({
+  storage: avatarStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Разрешена загрузка только изображений (PNG, JPG, WEBP, SVG, GIF)'));
+    }
+  },
+});
 
 const router = Router();
 
@@ -49,6 +81,8 @@ const targetSubjectSchema = z.object({
 });
 
 const updateProfileSchema = z.object({
+  name: z.string().trim().min(1, 'Имя не может быть пустым').max(50, 'Слишком длинное имя (максимум 50 символов)').optional(),
+  avatarUrl: z.string().trim().nullable().optional(),
   grade: z.number().int().min(9).max(11).optional(),
   track: z.string().optional(),
   targetTrack: z.enum(['BASE_65', 'SOLID_85', 'OLYMP_95']).optional(),
@@ -86,6 +120,8 @@ router.get('/', requireAuth, async (req, res) => {
     const freshUser = await prisma.user.findUnique({
       where: { id: user.id },
       select: {
+        name: true,
+        avatarUrl: true,
         email: true,
         authProvider: true,
         telegramId: true,
@@ -124,6 +160,8 @@ router.get('/', requireAuth, async (req, res) => {
         remainingDays,
         remainingWeeks,
       },
+      name: freshUser?.name || user.name,
+      avatarUrl: freshUser?.avatarUrl || null,
       email: freshUser?.email || user.email,
       authProvider: freshUser?.authProvider || (user as any).authProvider || 'LOCAL',
       telegramId: freshUser?.telegramId || null,
@@ -221,8 +259,10 @@ router.put('/', requireAuth, async (req, res) => {
       }
     }
 
-    // Update User targetTrack, role, selectedAiModel and onboardingCompleted if provided
+    // Update User name, avatarUrl, targetTrack, role, selectedAiModel and onboardingCompleted if provided
     const userUpdateData: Record<string, unknown> = {};
+    if (data.name !== undefined) userUpdateData.name = data.name;
+    if (data.avatarUrl !== undefined) userUpdateData.avatarUrl = data.avatarUrl;
     if (data.targetTrack !== undefined) userUpdateData.targetTrack = data.targetTrack;
     if (data.role !== undefined) userUpdateData.role = data.role;
     if (data.onboardingCompleted !== undefined) userUpdateData.onboardingCompleted = data.onboardingCompleted;
@@ -241,6 +281,8 @@ router.put('/', requireAuth, async (req, res) => {
     const updatedUser = await prisma.user.findUnique({
       where: { id: user.id },
       select: {
+        name: true,
+        avatarUrl: true,
         role: true,
         targetTrack: true,
         selectedAiModel: true,
@@ -266,6 +308,8 @@ router.put('/', requireAuth, async (req, res) => {
         remainingDays,
         remainingWeeks,
       },
+      name: updatedUser?.name || user.name,
+      avatarUrl: updatedUser?.avatarUrl || null,
       targetSubjects,
       selectedAiModel: toCanonicalModelSlug(updatedUser?.selectedAiModel ?? user.selectedAiModel),
       role: updatedUser?.role || 'student',
@@ -280,6 +324,60 @@ router.put('/', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Некорректные данные', details: error.errors });
     }
     return res.status(500).json({ error: 'Ошибка обновления профиля' });
+  }
+});
+
+// POST /api/profile/avatar — Загрузка файла аватара пользователя
+router.post('/avatar', requireAuth, (req, res) => {
+  uploadAvatar.single('avatar')(req, res, async (err) => {
+    if (err) {
+      if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'Размер файла аватара не должен превышать 5 МБ' });
+      }
+      return res.status(400).json({ error: err.message || 'Ошибка загрузки аватара' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'Файл аватара не был передан' });
+    }
+
+    try {
+      const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+      const updatedUser = await prisma.user.update({
+        where: { id: req.user!.id },
+        data: { avatarUrl },
+        select: { id: true, name: true, avatarUrl: true },
+      });
+
+      return res.json({
+        success: true,
+        avatarUrl: updatedUser.avatarUrl,
+        name: updatedUser.name,
+      });
+    } catch (saveError) {
+      console.error('Save avatar error:', saveError);
+      return res.status(500).json({ error: 'Ошибка сохранения аватара' });
+    }
+  });
+});
+
+// DELETE /api/profile/avatar — Сброс (удаление) аватара
+router.delete('/avatar', requireAuth, async (req, res) => {
+  try {
+    const updatedUser = await prisma.user.update({
+      where: { id: req.user!.id },
+      data: { avatarUrl: null },
+      select: { id: true, name: true, avatarUrl: true },
+    });
+
+    return res.json({
+      success: true,
+      avatarUrl: null,
+      name: updatedUser.name,
+    });
+  } catch (error) {
+    console.error('Delete avatar error:', error);
+    return res.status(500).json({ error: 'Ошибка сброса аватара' });
   }
 });
 

@@ -3,6 +3,7 @@ import { useLocation, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { errText } from '../lib/errors';
 import { useToastStore } from '../store/toastStore';
+import { useAuthStore } from '../store/authStore';
 import { hudConfirm } from '../store/confirmStore';
 import { LatexText } from '../components/LatexText';
 import { InteractivePlotter } from '../components/InteractivePlotter';
@@ -423,6 +424,7 @@ export function AIChat() {
   const processedKeyRef = useRef<string | null>(null);
 
   const { addToast } = useToastStore();
+  const { user } = useAuthStore();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMsg[]>([GREETING]);
@@ -1057,11 +1059,25 @@ export function AIChat() {
           ) : (
             messages.map((m, i) =>
               m.role === 'user' ? (
-                <div key={m.id ?? i} className="flex justify-end">
+                <div key={m.id ?? i} className="flex justify-end gap-2 items-start">
                   <div className="max-w-[85%] border border-white/10 bg-white/[0.05] px-4 py-2.5 text-sm font-light leading-relaxed text-zinc-100">
                     <MessageAttachments items={m.attachments ?? []} />
                     <ChatMessageContent content={m.content} />
                   </div>
+                  {user?.avatarUrl ? (
+                    <img
+                      src={user.avatarUrl}
+                      alt={user?.name || 'User'}
+                      className="mt-0.5 h-7 w-7 shrink-0 object-cover border border-[#d4ff00]/60 rounded-none bg-zinc-950"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center bg-zinc-800 text-zinc-200 font-display font-bold text-xs border border-white/10 rounded-none">
+                      {((user?.name || 'U')[0] || 'U').toUpperCase()}
+                    </span>
+                  )}
                 </div>
               ) : (
                 <div key={m.id ?? i} className="flex justify-start gap-2">

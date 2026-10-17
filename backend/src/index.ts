@@ -185,6 +185,13 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Публичные аватары пользователей (доступны без авторизационных кук для img-тегов)
+const avatarsDir = path.resolve('uploads/avatars');
+if (!fs.existsSync(avatarsDir)) {
+  fs.mkdirSync(avatarsDir, { recursive: true });
+}
+app.use('/uploads/avatars', express.static(avatarsDir));
+
 // Файлы вложений (фото работ, сканы чистовиков): доступ строго для авторизованных пользователей (152-ФЗ)
 app.use('/uploads', requireAuth, express.static(path.resolve('uploads')));
 

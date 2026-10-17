@@ -210,9 +210,20 @@ export function Sidebar() {
       <div className="mt-auto shrink-0 border-t border-zinc-800/60 pt-4">
         <div className="border border-white/10 bg-white/[0.02] p-4 backdrop-blur-xl">
           <div className="mb-3 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center bg-[#d4ff00] font-display text-base font-extrabold text-black">
-              {firstLetter}
-            </div>
+            {user?.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt={displayName}
+                className="h-10 w-10 shrink-0 object-cover border border-[#d4ff00]/60 bg-zinc-950 rounded-none"
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = 'none';
+                }}
+              />
+            ) : (
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-[#d4ff00] font-display text-base font-extrabold text-black">
+                {firstLetter}
+              </div>
+            )}
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between">
                 <span className="truncate text-sm font-semibold text-zinc-100">{displayName}</span>

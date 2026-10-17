@@ -7,7 +7,9 @@ import { MeshConnectBanner } from '../components/MeshConnectBanner';
 import { MeshConnectedCard } from '../components/MeshConnectedCard';
 import { useToastStore } from '../store/toastStore';
 import { useAuthStore } from '../store/authStore';
-import { User, Calendar, Plus, Trash2, FileText, Shield, Zap } from 'lucide-react';
+import { hudConfirm } from '../store/confirmStore';
+import { PRESET_AVATARS, type PresetAvatar } from '../lib/presetAvatars';
+import { User, Calendar, Plus, Trash2, FileText, Shield, Zap, Camera, Sparkles, Upload, Check } from 'lucide-react';
 import type { AiModel, Profile } from '../lib/types';
 import { errText } from '../lib/errors';
 import { EGE_SUBJECTS_LIST } from '../lib/subjects';
@@ -70,9 +72,18 @@ export function ProfilePage() {
   const [emailLoading, setEmailLoading] = useState(false);
   const [emailDevCode, setEmailDevCode] = useState<string | null>(null);
 
-  const googleButtonRef = useRef<HTMLDivElement>(null);
   const { addToast } = useToastStore();
   const { user } = useAuthStore();
+
+  // Никнейм и Аватар
+  const [nameInput, setNameInput] = useState(user?.name || '');
+  const [isSavingName, setIsSavingName] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [showPresetAvatars, setShowPresetAvatars] = useState(false);
+  const [customAvatarUrlInput, setCustomAvatarUrlInput] = useState('');
+  const avatarFileInputRef = useRef<HTMLInputElement>(null);
+
+  const googleButtonRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadProfile();
@@ -84,12 +95,17 @@ export function ProfilePage() {
     try {
       const result = await api.getProfile();
       setProfile(result);
+      if (result.name) {
+        setNameInput(result.name);
+      }
       if (result.targetTrack) {
         setTargetTrack(result.targetTrack as any);
       }
-      if (result.email) {
+      if (result.email || result.name || result.avatarUrl !== undefined) {
         useAuthStore.getState().updateUser({
           email: result.email,
+          name: result.name || user?.name,
+          avatarUrl: result.avatarUrl,
           telegramId: result.telegramId,
           telegramUsername: result.telegramUsername,
         });
@@ -173,6 +189,119 @@ export function ProfilePage() {
       addToast('success', 'Профиль и стратегия обновлены');
     } catch (error) {
       addToast('error', errText(error) || 'Ошибка сохранения');
+    }
+  };
+
+  const handleSaveName = async () => {
+    const trimmed = nameInput.trim();
+    if (!trimmed) {
+      addToast('error', 'Позывной не может быть пустым');
+      return;
+    }
+    if (trimmed.length > 50) {
+      addToast('error', 'Слишком длинное имя (максимум 50 символов)');
+      return;
+    }
+    setIsSavingName(true);
+    try {
+      await api.updateProfile({ name: trimmed });
+      useAuthStore.getState().updateUser({ name: trimmed });
+      setProfile((prev) => (prev ? { ...prev, name: trimmed } : prev));
+      addToast('success', `Позывной сохранён: ${trimmed}`);
+    } catch (error) {
+      addToast('error', errText(error) || 'Ошибка обновления позывного');
+    } finally {
+      setIsSavingName(false);
+    }
+  };
+
+  const handleAvatarFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      addToast('error', 'Пожалуйста, выберите изображение (PNG, JPG, SVG, WEBP, GIF)');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      addToast('error', 'Размер файла превышает 5 МБ');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    try {
+      const res = await api.uploadAvatar(file);
+      setProfile((prev) => (prev ? { ...prev, avatarUrl: res.avatarUrl } : prev));
+      useAuthStore.getState().updateUser({ avatarUrl: res.avatarUrl });
+      addToast('success', 'Аватар успешно загружен и сохранён');
+    } catch (error) {
+      addToast('error', errText(error) || 'Ошибка загрузки аватара');
+    } finally {
+      setIsUploadingAvatar(false);
+      if (avatarFileInputRef.current) {
+        avatarFileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleSelectPresetAvatar = async (preset: PresetAvatar) => {
+    setIsUploadingAvatar(true);
+    try {
+      await api.updateProfile({ avatarUrl: preset.dataUrl });
+      useAuthStore.getState().updateUser({ avatarUrl: preset.dataUrl });
+      setProfile((prev) => (prev ? { ...prev, avatarUrl: preset.dataUrl } : prev));
+      addToast('success', `Установлен аватар: ${preset.name}`);
+      setShowPresetAvatars(false);
+    } catch (error) {
+      addToast('error', errText(error) || 'Ошибка сохранения аватара');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  const handleApplyCustomUrlAvatar = async () => {
+    const url = customAvatarUrlInput.trim();
+    if (!url) {
+      addToast('error', 'Укажите ссылку на изображение');
+      return;
+    }
+    if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('data:')) {
+      addToast('error', 'Ссылка должна начинаться с https:// или data:');
+      return;
+    }
+    setIsUploadingAvatar(true);
+    try {
+      await api.updateProfile({ avatarUrl: url });
+      useAuthStore.getState().updateUser({ avatarUrl: url });
+      setProfile((prev) => (prev ? { ...prev, avatarUrl: url } : prev));
+      setCustomAvatarUrlInput('');
+      addToast('success', 'Аватар по ссылке успешно установлен');
+      setShowPresetAvatars(false);
+    } catch (error) {
+      addToast('error', errText(error) || 'Ошибка применения аватара');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  const handleResetAvatar = async () => {
+    const ok = await hudConfirm({
+      title: 'СБРОС АВАТАРА',
+      message: 'Вы действительно хотите удалить текущий аватар и вернуться к стандартному инициалу?',
+      confirmText: '[ СБРОСИТЬ ]',
+      cancelText: '[ ОТМЕНА ]',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
+    try {
+      await api.deleteAvatar();
+      useAuthStore.getState().updateUser({ avatarUrl: null });
+      setProfile((prev) => (prev ? { ...prev, avatarUrl: null } : prev));
+      addToast('info', 'Аватар сброшен');
+    } catch (error) {
+      addToast('error', errText(error) || 'Ошибка сброса аватара');
     }
   };
 
@@ -576,42 +705,265 @@ export function ProfilePage() {
         </button>
       </div>
 
-      {/* User Info */}
-      <div className="card-shelf mb-4 p-6">
-        <div className="flex flex-wrap items-center gap-4 mb-6">
-          <div className="flex h-16 w-16 items-center justify-center bg-[#d4ff00] font-display text-2xl font-extrabold text-black">
-            <User className="h-8 w-8" />
+      {/* [ IDENTITY // ПЕРСОНАЛИЗАЦИЯ ПРОФИЛЯ ] */}
+      <div className="card-shelf mb-4 p-6 relative overflow-hidden border border-white/10">
+        <div className="flex items-center justify-between gap-4 mb-5 border-b border-white/[0.08] pb-3">
+          <div className="flex items-center gap-2">
+            <User className="h-4 w-4 text-[#d4ff00]" />
+            <h3 className="font-display text-lg font-bold uppercase tracking-tight text-white">
+              Идентификация // Ник и аватар
+            </h3>
           </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="font-display text-xl font-bold tracking-tight text-white">{user?.name}</h2>
-            <p className="text-sm font-light text-zinc-400">{profile?.email || user?.email}</p>
-            {user?.isDemo && (
-              <div className="flex items-center gap-2 mt-1">
-                <span className="px-2 py-1 bg-orange-500/20 border border-orange-500/30 text-orange-400 text-xs rounded-none">
-                  DEMO
-                </span>
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-1.5">
-            {[9, 10, 11].map((g) => (
+          <span className="hud-tag !text-[9px]">[ IDENTITY & AVATAR PROTOCOL ]</span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+          {/* Слева: аватар, загрузка и быстрое управление */}
+          <div className="md:col-span-4 flex flex-col items-center sm:items-start text-center sm:text-left gap-3">
+            <div className="relative group">
+              <div className="pointer-events-none absolute -top-1 -left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-[#d4ff00]" />
+              <div className="pointer-events-none absolute -top-1 -right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-[#d4ff00]" />
+              <div className="pointer-events-none absolute -bottom-1 -left-1 w-2.5 h-2.5 border-b-2 border-l-2 border-[#d4ff00]" />
+              <div className="pointer-events-none absolute -bottom-1 -right-1 w-2.5 h-2.5 border-b-2 border-r-2 border-[#d4ff00]" />
+
+              {/* Отображение аватара */}
+              {user?.avatarUrl || profile.avatarUrl ? (
+                <img
+                  src={user?.avatarUrl || profile.avatarUrl || ''}
+                  alt={user?.name || 'Avatar'}
+                  className="w-24 h-24 md:w-28 md:h-28 object-cover bg-zinc-950 border border-white/20 rounded-none shadow-md"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
+                  }}
+                />
+              ) : (
+                <div className="w-24 h-24 md:w-28 md:h-28 bg-[#d4ff00] text-black font-display font-black text-4xl flex items-center justify-center rounded-none shadow-md">
+                  {((nameInput || user?.name || 'U')[0] || 'U').toUpperCase()}
+                </div>
+              )}
+
+              {/* Оверлей при наведении для быстрой смены */}
               <button
-                key={g}
-                onClick={() => void changeGrade(g)}
-                title={`${g} класс`}
-                className={`px-3 py-2 font-mono text-xs tracking-[0.15em] transition-colors border ${profile.grade === g
-                  ? 'border-[#d4ff00]/60 bg-[#d4ff00]/[0.10] text-[#d4ff00] font-semibold'
-                  : 'border-white/10 bg-white/[0.03] text-zinc-400 hover:border-white/20 hover:text-zinc-100'
-                  }`}
+                type="button"
+                onClick={() => avatarFileInputRef.current?.click()}
+                title="Загрузить новое фото"
+                className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 text-[#d4ff00] font-mono text-[10px] uppercase font-bold"
               >
-                {g}
+                <Camera className="w-5 h-5" />
+                <span>ИЗМЕНИТЬ</span>
               </button>
-            ))}
-            <span className="ml-1 font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">
-              класс
-            </span>
+            </div>
+
+            {/* Скрытый input file */}
+            <input
+              type="file"
+              ref={avatarFileInputRef}
+              accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif"
+              onChange={handleAvatarFileUpload}
+              className="hidden"
+            />
+
+            {/* Кнопки управления аватаром */}
+            <div className="flex flex-wrap gap-2 w-full justify-center sm:justify-start pt-1">
+              <button
+                type="button"
+                disabled={isUploadingAvatar}
+                onClick={() => avatarFileInputRef.current?.click()}
+                className="btn-ghost !text-[10px] !py-1.5 !px-2.5 font-mono uppercase tracking-wider border-white/20 text-zinc-300 hover:text-white hover:border-[#d4ff00]/60 flex items-center gap-1.5 rounded-none"
+              >
+                <Upload className="w-3.5 h-3.5 text-[#d4ff00]" />
+                <span>[ {isUploadingAvatar ? 'ЗАГРУЗКА...' : 'ЗАГРУЗИТЬ ФОТО'} ]</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowPresetAvatars((v) => !v)}
+                className={`btn-ghost !text-[10px] !py-1.5 !px-2.5 font-mono uppercase tracking-wider flex items-center gap-1.5 rounded-none transition-colors ${
+                  showPresetAvatars
+                    ? 'border-[#d4ff00] text-[#d4ff00] bg-[#d4ff00]/10'
+                    : 'border-white/20 text-zinc-300 hover:text-white hover:border-[#d4ff00]/60'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-[#d4ff00]" />
+                <span>[ КАТАЛОГ HUD ]</span>
+              </button>
+
+              {(user?.avatarUrl || profile.avatarUrl) && (
+                <button
+                  type="button"
+                  onClick={handleResetAvatar}
+                  className="btn-ghost !text-[10px] !py-1.5 !px-2.5 font-mono uppercase tracking-wider border-red-500/30 text-red-400 hover:bg-red-500/10 hover:border-red-500 flex items-center gap-1.5 rounded-none"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>[ СБРОСИТЬ ]</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Справа: редактирование ника, класс, статус */}
+          <div className="md:col-span-8 space-y-4">
+            <div>
+              <label className="hud-tag block mb-1.5 text-zinc-400">
+                ПОЗЫВНОЙ // НИКНЕЙМ УЧЕНИКА:
+              </label>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    value={nameInput}
+                    maxLength={50}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSaveName();
+                      }
+                    }}
+                    placeholder="Введите ваш ник..."
+                    className="w-full rounded-none border border-white/20 bg-black/60 px-3.5 py-2.5 font-mono text-sm text-white placeholder-zinc-600 focus:border-[#d4ff00] focus:outline-none transition-colors"
+                  />
+                  <span className="absolute right-3 top-3 font-mono text-[10px] text-zinc-600">
+                    {nameInput.length}/50
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  disabled={isSavingName || !nameInput.trim() || nameInput.trim() === (user?.name || '')}
+                  onClick={handleSaveName}
+                  className="btn-lime !py-2.5 !px-5 text-xs font-mono font-bold uppercase tracking-wider rounded-none disabled:opacity-40 disabled:pointer-events-none transition-all shadow-none whitespace-nowrap"
+                >
+                  {isSavingName ? 'СОХРАНЕНИЕ...' : '[ СОХРАНИТЬ НИК ]'}
+                </button>
+              </div>
+              <p className="font-mono text-[10px] text-zinc-500 mt-1.5 leading-relaxed">
+                * Отображается в PvP Battleground, AI-Чате, Сайдбаре и официальных КИМ-отчетах.
+              </p>
+            </div>
+
+            {/* Класс и метаданные аккаунта */}
+            <div className="pt-2 border-t border-white/[0.08] flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <span className="hud-tag block mb-1.5 text-zinc-400">ТЕКУЩИЙ КЛАСС:</span>
+                <div className="flex items-center gap-1.5">
+                  {[9, 10, 11].map((g) => (
+                    <button
+                      key={g}
+                      type="button"
+                      onClick={() => void changeGrade(g)}
+                      title={`${g} класс`}
+                      className={`px-3 py-1.5 font-mono text-xs tracking-[0.15em] transition-colors border ${
+                        profile.grade === g
+                          ? 'border-[#d4ff00]/60 bg-[#d4ff00]/[0.10] text-[#d4ff00] font-semibold'
+                          : 'border-white/10 bg-white/[0.03] text-zinc-400 hover:border-white/20 hover:text-zinc-100'
+                      }`}
+                    >
+                      {g}
+                    </button>
+                  ))}
+                  <span className="ml-1 font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">
+                    класс
+                  </span>
+                </div>
+              </div>
+
+              <div className="text-right">
+                <span className="hud-tag block mb-1 text-zinc-500">EMAIL АККАУНТА:</span>
+                <span className="font-mono text-xs text-zinc-300">{profile?.email || user?.email}</span>
+                {user?.isDemo && (
+                  <span className="ml-2 px-1.5 py-0.5 bg-orange-500/20 border border-orange-500/30 text-orange-400 text-[10px] font-mono rounded-none">
+                    DEMO
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
+
+        {/* Разворачивающийся каталог тактических HUD-аватаров */}
+        {showPresetAvatars && (
+          <div className="mt-6 pt-5 border-t border-white/10 space-y-4 animate-in fade-in duration-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-[#d4ff00]" />
+                <span className="font-mono text-xs font-bold text-white uppercase tracking-wider">
+                  КАТАЛОГ ТАКТИЧЕСКИХ HUD-АВАТАРОВ EGE.SYSTEM:
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPresetAvatars(false)}
+                className="text-zinc-500 hover:text-white transition-colors text-xs font-mono"
+              >
+                [ СВЕРНУТЬ ✕ ]
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {PRESET_AVATARS.map((preset) => {
+                const isSelected = (user?.avatarUrl || profile.avatarUrl) === preset.dataUrl;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => handleSelectPresetAvatar(preset)}
+                    className={`group relative p-3 border text-left transition-all ${
+                      isSelected
+                        ? 'border-[#d4ff00] bg-[#d4ff00]/10 shadow-sm'
+                        : 'border-white/10 bg-black/40 hover:border-white/30 hover:bg-white/[0.04]'
+                    }`}
+                  >
+                    <div className="relative mb-2 aspect-square w-full overflow-hidden border border-white/10 bg-zinc-950 flex items-center justify-center">
+                      <img
+                        src={preset.dataUrl}
+                        alt={preset.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                      />
+                      {isSelected && (
+                        <div className="absolute top-1 right-1 bg-[#d4ff00] text-black p-0.5 font-bold">
+                          <Check className="w-3.5 h-3.5" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="font-mono text-[10px] font-bold text-white truncate uppercase">
+                      {preset.name}
+                    </div>
+                    <div className="font-mono text-[8px] text-[#d4ff00] tracking-wider uppercase mt-0.5">
+                      {preset.badge}
+                    </div>
+                    <p className="text-[10px] text-zinc-400 font-sans line-clamp-2 mt-1 leading-snug">
+                      {preset.description}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Ввод ссылки на кастомное изображение */}
+            <div className="p-3 bg-zinc-950/80 border border-white/10 space-y-2 mt-3">
+              <label className="hud-tag block text-zinc-400">
+                ИЛИ ВСТАВЬТЕ ССЫЛКУ НА ВНЕШНЕЕ ИЗОБРАЖЕНИЕ (URL):
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={customAvatarUrlInput}
+                  onChange={(e) => setCustomAvatarUrlInput(e.target.value)}
+                  placeholder="https://example.com/avatar.png"
+                  className="flex-1 rounded-none border border-white/15 bg-black/60 px-3 py-1.5 font-mono text-xs text-white placeholder-zinc-600 focus:border-[#d4ff00] focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleApplyCustomUrlAvatar}
+                  disabled={!customAvatarUrlInput.trim()}
+                  className="rounded-none border border-white/20 bg-zinc-900 px-3.5 py-1.5 font-mono text-xs uppercase text-zinc-300 hover:text-white hover:border-[#d4ff00] disabled:opacity-40"
+                >
+                  [ ПРИМЕНИТЬ ]
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* [ ПРОКАЧКА // УРОВЕНЬ И ОПЫТ ] */}

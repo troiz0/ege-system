@@ -230,9 +230,11 @@ class ApiClient {
     };
   }
 
-  async updateProfile(data: Partial<Profile>) {
+  async updateProfile(data: Partial<Profile> & { name?: string; avatarUrl?: string | null }) {
     const res = await this.request<{
       profile: Profile;
+      name?: string;
+      avatarUrl?: string | null;
       targetSubjects: TargetSubject[];
       selectedAiModel?: string;
       xp?: number;
@@ -248,6 +250,34 @@ class ApiClient {
     if (res.profile && typeof res.profile.grade === 'number') {
       useAuthStore.getState().updateUserGrade(res.profile.grade);
     }
+    if (res.name) {
+      useAuthStore.getState().updateUser({ name: res.name });
+    }
+    if (res.avatarUrl !== undefined) {
+      useAuthStore.getState().updateUser({ avatarUrl: res.avatarUrl });
+    }
+    return res;
+  }
+
+  async uploadAvatar(file: File) {
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    const data = await this.request<{ success: boolean; avatarUrl: string; name?: string }>('/api/profile/avatar', {
+      method: 'POST',
+      body: formData,
+    });
+    if (data.avatarUrl) {
+      useAuthStore.getState().updateUser({ avatarUrl: data.avatarUrl });
+    }
+    return data;
+  }
+
+  async deleteAvatar() {
+    const res = await this.request<{ success: boolean; avatarUrl: null }>('/api/profile/avatar', {
+      method: 'DELETE',
+    });
+    useAuthStore.getState().updateUser({ avatarUrl: null });
     return res;
   }
 
