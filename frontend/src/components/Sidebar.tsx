@@ -43,7 +43,7 @@ const menuGroups = [
       { path: '/homework', icon: ClipboardList, label: 'Задания', code: 'HW' },
       { path: '/mesh-diary', icon: School, label: 'Дневник МЭШ', code: 'MESH' },
       { path: '/chat', icon: MessageSquare, label: 'AI-Чат', code: 'CHAT' },
-      { path: '/arena', icon: Swords, label: 'PvP Арена', code: 'PVP' },
+      { path: '/arena', icon: Swords, label: 'BATTLEGROUND', code: 'PVP' },
     ],
   },
   {

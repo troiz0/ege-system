@@ -108,8 +108,8 @@ const matches = new Map<string, PvpMatch>();
 
 const BOT_NAMES = [
   'Абитуриент Физтеха (Рейтинг 1840)',
-  'Лицеист ВШЭ (Рейтинг 1920)',
-  'Олимпиадник МГУ (Рейтинг 1890)',
+  'Кибер-Спарринг EGE (Рейтинг 1920)',
+  'Нейро-Оппонент (Рейтинг 1890)',
   'Стобалльник СУНЦ (Рейтинг 1960)',
   'Нейро-Соперник EGE (Рейтинг 1880)',
 ];
@@ -169,7 +169,7 @@ router.post('/queue', requireAuth, async (req, res) => {
         tasks: getRandomTasks(3),
         player1: {
           userId: user.id,
-          userName: user.name || 'Кандидат в бюджет',
+          userName: user.name || 'Боец Battleground',
           solvedTasksCount: 0,
           answers: {},
         },
@@ -194,7 +194,7 @@ router.post('/queue', requireAuth, async (req, res) => {
     if (!selfEntry) {
       selfEntry = {
         userId: user.id,
-        userName: user.name || 'Кандидат в бюджет',
+        userName: user.name || 'Боец Battleground',
         queuedAt: Date.now(),
       };
       queue.push(selfEntry);
@@ -218,7 +218,7 @@ router.post('/queue', requireAuth, async (req, res) => {
         tasks: getRandomTasks(3),
         player1: {
           userId: user.id,
-          userName: user.name || 'Кандидат в бюджет',
+          userName: user.name || 'Боец Battleground',
           solvedTasksCount: 0,
           answers: {},
         },

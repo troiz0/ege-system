@@ -53,3 +53,4 @@ Thumbs.db
 *.sln
 *.sw?
 tests_swarm/
+.browser_profile/
